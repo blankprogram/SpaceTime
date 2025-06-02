@@ -1,4 +1,4 @@
-#define GLFW_INCLUDE_NONE
+#define STB_IMAGE_IMPLEMENTATION
 #include <GLFW/glfw3.h>
 #include <glad/glad.h>
 
@@ -6,15 +6,12 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
+#include <stb_image.h>
+
 #include <fstream>
 #include <iostream>
 #include <sstream>
 #include <stdexcept>
-
-// Resize callback for GLFW
-void framebuffer_size_callback(GLFWwindow *window, int width, int height) {
-  glViewport(0, 0, width, height);
-}
 
 std::string load_shader(const char *path) {
   std::ifstream file(path);
@@ -60,24 +57,30 @@ GLuint create_shader_program(const char *vs_path, const char *fs_path) {
 }
 
 float cubeVertices[] = {
-    // back face
-    -0.5f, -0.5f, -0.5f, 0.5f, 0.5f, -0.5f, 0.5f, -0.5f, -0.5f, 0.5f, 0.5f,
-    -0.5f, -0.5f, -0.5f, -0.5f, -0.5f, 0.5f, -0.5f,
-    // front face
-    -0.5f, -0.5f, 0.5f, 0.5f, -0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f,
-    -0.5f, 0.5f, 0.5f, -0.5f, -0.5f, 0.5f,
-    // left face
-    -0.5f, 0.5f, 0.5f, -0.5f, 0.5f, -0.5f, -0.5f, -0.5f, -0.5f, -0.5f, -0.5f,
-    -0.5f, -0.5f, -0.5f, 0.5f, -0.5f, 0.5f, 0.5f,
-    // right face
-    0.5f, 0.5f, 0.5f, 0.5f, -0.5f, -0.5f, 0.5f, 0.5f, -0.5f, 0.5f, -0.5f, -0.5f,
-    0.5f, 0.5f, 0.5f, 0.5f, -0.5f, 0.5f,
-    // bottom face
-    -0.5f, -0.5f, -0.5f, 0.5f, -0.5f, -0.5f, 0.5f, -0.5f, 0.5f, 0.5f, -0.5f,
-    0.5f, -0.5f, -0.5f, 0.5f, -0.5f, -0.5f, -0.5f,
-    // top face
-    -0.5f, 0.5f, -0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f, -0.5f, 0.5f, 0.5f, 0.5f,
-    -0.5f, 0.5f, -0.5f, -0.5f, 0.5f, 0.5f};
+    // x, y, z, u, v
+    -0.5f, -0.5f, -0.5f, 0.0f, 0.0f, 0.5f,  -0.5f, -0.5f, 1.0f, 0.0f,
+    0.5f,  0.5f,  -0.5f, 1.0f, 1.0f, 0.5f,  0.5f,  -0.5f, 1.0f, 1.0f,
+    -0.5f, 0.5f,  -0.5f, 0.0f, 1.0f, -0.5f, -0.5f, -0.5f, 0.0f, 0.0f,
+
+    -0.5f, -0.5f, 0.5f,  0.0f, 0.0f, 0.5f,  -0.5f, 0.5f,  1.0f, 0.0f,
+    0.5f,  0.5f,  0.5f,  1.0f, 1.0f, 0.5f,  0.5f,  0.5f,  1.0f, 1.0f,
+    -0.5f, 0.5f,  0.5f,  0.0f, 1.0f, -0.5f, -0.5f, 0.5f,  0.0f, 0.0f,
+
+    -0.5f, 0.5f,  0.5f,  1.0f, 0.0f, -0.5f, 0.5f,  -0.5f, 1.0f, 1.0f,
+    -0.5f, -0.5f, -0.5f, 0.0f, 1.0f, -0.5f, -0.5f, -0.5f, 0.0f, 1.0f,
+    -0.5f, -0.5f, 0.5f,  0.0f, 0.0f, -0.5f, 0.5f,  0.5f,  1.0f, 0.0f,
+
+    0.5f,  0.5f,  0.5f,  1.0f, 0.0f, 0.5f,  0.5f,  -0.5f, 1.0f, 1.0f,
+    0.5f,  -0.5f, -0.5f, 0.0f, 1.0f, 0.5f,  -0.5f, -0.5f, 0.0f, 1.0f,
+    0.5f,  -0.5f, 0.5f,  0.0f, 0.0f, 0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+
+    -0.5f, -0.5f, -0.5f, 0.0f, 1.0f, 0.5f,  -0.5f, -0.5f, 1.0f, 1.0f,
+    0.5f,  -0.5f, 0.5f,  1.0f, 0.0f, 0.5f,  -0.5f, 0.5f,  1.0f, 0.0f,
+    -0.5f, -0.5f, 0.5f,  0.0f, 0.0f, -0.5f, -0.5f, -0.5f, 0.0f, 1.0f,
+
+    -0.5f, 0.5f,  -0.5f, 0.0f, 1.0f, 0.5f,  0.5f,  -0.5f, 1.0f, 1.0f,
+    0.5f,  0.5f,  0.5f,  1.0f, 0.0f, 0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+    -0.5f, 0.5f,  0.5f,  0.0f, 0.0f, -0.5f, 0.5f,  -0.5f, 0.0f, 1.0f};
 
 int main() {
   if (!glfwInit())
@@ -87,19 +90,11 @@ int main() {
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 5);
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-  GLFWwindow *window =
-      glfwCreateWindow(800, 600, "Resizable Cube", nullptr, nullptr);
+  GLFWwindow *window = glfwCreateWindow(800, 600, "na", nullptr, nullptr);
   if (!window)
     return -1;
-
   glfwMakeContextCurrent(window);
-
-  if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
-    std::cerr << "Failed to initialize GLAD\n";
-    return -1;
-  }
-
-  glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+  gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
 
   int width, height;
   glfwGetFramebufferSize(window, &width, &height);
@@ -116,27 +111,48 @@ int main() {
   glBindBuffer(GL_ARRAY_BUFFER, VBO);
   glBufferData(GL_ARRAY_BUFFER, sizeof(cubeVertices), cubeVertices,
                GL_STATIC_DRAW);
-  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), nullptr);
+  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void *)0);
   glEnableVertexAttribArray(0);
+  glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float),
+                        (void *)(3 * sizeof(float)));
+  glEnableVertexAttribArray(1);
+
+  GLuint texture;
+  glGenTextures(1, &texture);
+  glBindTexture(GL_TEXTURE_2D, texture);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+  int texWidth, texHeight, texChannels;
+  stbi_set_flip_vertically_on_load(true);
+  unsigned char *data =
+      stbi_load("textures/anger.jpg", &texWidth, &texHeight, &texChannels, 0);
+  if (data) {
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, texWidth, texHeight, 0, GL_RGB,
+                 GL_UNSIGNED_BYTE, data);
+    glGenerateMipmap(GL_TEXTURE_2D);
+  } else {
+    std::cerr << "Failed to load texture\n";
+  }
+  stbi_image_free(data);
 
   glEnable(GL_DEPTH_TEST);
-
   GLint mvpLoc = glGetUniformLocation(shaderProgram, "u_MVP");
+  GLint texLoc = glGetUniformLocation(shaderProgram, "u_Texture");
 
   while (!glfwWindowShouldClose(window)) {
-    float time = glfwGetTime();
+    glfwGetFramebufferSize(window, &width, &height);
+    glViewport(0, 0, width, height);
 
+    float time = glfwGetTime();
     glm::mat4 model =
         glm::rotate(glm::mat4(1.0f), time, glm::vec3(0.3f, 1.0f, 0.0f));
     glm::mat4 view =
-        glm::lookAt(glm::vec3(0.0f, 0.0f, 3.0f), glm::vec3(0.0f, 0.0f, 0.0f),
-                    glm::vec3(0.0f, 1.0f, 0.0f));
-
-    glfwGetFramebufferSize(window, &width, &height);
-    float aspect = static_cast<float>(width) / height;
-    glm::mat4 proj =
-        glm::perspective(glm::radians(45.0f), aspect, 0.1f, 100.0f);
-
+        glm::lookAt(glm::vec3(0, 0, 3), glm::vec3(0), glm::vec3(0, 1, 0));
+    glm::mat4 proj = glm::perspective(glm::radians(45.0f),
+                                      (float)width / height, 0.1f, 100.0f);
     glm::mat4 mvp = proj * view * model;
 
     glClearColor(0.1f, 0.1f, 0.2f, 1.0f);
@@ -144,6 +160,11 @@ int main() {
 
     glUseProgram(shaderProgram);
     glUniformMatrix4fv(mvpLoc, 1, GL_FALSE, glm::value_ptr(mvp));
+    glUniform1i(texLoc, 0);
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, texture);
+
     glBindVertexArray(VAO);
     glDrawArrays(GL_TRIANGLES, 0, 36);
 
@@ -153,4 +174,5 @@ int main() {
 
   glfwDestroyWindow(window);
   glfwTerminate();
+  return 0;
 }
