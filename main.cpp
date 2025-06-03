@@ -1,7 +1,8 @@
 #include <GLFW/glfw3.h>
+#include <algorithm>
 #include <glad/glad.h>
-#include <glm/fwd.hpp>
 
+#include <glm/fwd.hpp>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -15,24 +16,31 @@
 #include <stdexcept>
 #include <vector>
 
-// -------------------------
+// Trail‐point struct
+struct TrailPoint {
+    glm::vec3 pos;
+    float life;
+};
+
 // Constants and Globals
-// -------------------------
-static constexpr size_t TRAIL_LIMIT = 500;
 static constexpr float G_CONST = 0.5f;
 static constexpr float SUN_MASS = 10000.0f;
 static constexpr float EARTH_MASS = 1.0f;
 static constexpr float EARTH_DISTANCE = 20.0f;
 static const float EARTH_SPEED = std::sqrt(G_CONST * SUN_MASS / EARTH_DISTANCE);
 
-static std::vector<glm::vec3> earthTrail;
+static constexpr float POINT_LIFETIME = 5.0f;
+static constexpr float SAMPLE_INTERVAL = 0.025f;
+static constexpr size_t MAX_TRAIL_POINTS = 1000;
+
+static std::vector<TrailPoint> earthTrail;
 static GLuint trailVAO = 0, trailVBO = 0;
+static float sampleAccumulator = 0.0f;
 
 static glm::vec3 sunPos = glm::vec3(0.0f);
 static glm::vec3 earthPos = glm::vec3(EARTH_DISTANCE, 0.0f, 0.0f);
 static glm::vec3 earthVel = glm::vec3(0.0f, 0.0f, EARTH_SPEED);
 
-// Camera state
 static glm::vec3 cameraPos = glm::vec3(0.0f, 0.0f, 3.0f);
 static glm::vec3 cameraFront = glm::vec3(0.0f, 0.0f, -1.0f);
 static glm::vec3 cameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
@@ -46,22 +54,24 @@ static bool firstMouse = true;
 static float deltaTime = 0.0f;
 static float lastFrame = 0.0f;
 
-// -------------------------
 // Function Declarations
-// -------------------------
 void processInput(GLFWwindow *window);
 void mouseCallback(GLFWwindow *window, double xpos, double ypos);
+
 std::string loadShaderSource(const char *path);
 GLuint compileShader(GLenum type, const std::string &source);
 GLuint createShaderProgram(const char *vsPath, const char *fsPath);
+
 void generateSphereMesh(std::vector<float> &vertices,
                         std::vector<unsigned int> &indices, float radius = 1.0f,
                         int sectorCount = 36, int stackCount = 18);
+
 GLuint loadTexture(const char *filePath);
 
-// -------------------------
+void setupTrailBuffers();
+void updateTrail(float dt);
+
 // Process keyboard input
-// -------------------------
 void processInput(GLFWwindow *window) {
     float baseSpeed = 2.5f;
     float speedMultiplier =
@@ -84,9 +94,7 @@ void processInput(GLFWwindow *window) {
         cameraPos -= cameraSpeed * cameraUp;
 }
 
-// -------------------------
 // Mouse movement callback
-// -------------------------
 void mouseCallback(GLFWwindow *window, double xpos, double ypos) {
     if (firstMouse) {
         lastX = static_cast<float>(xpos);
@@ -114,9 +122,7 @@ void mouseCallback(GLFWwindow *window, double xpos, double ypos) {
     cameraFront = glm::normalize(direction);
 }
 
-// -------------------------
 // Load shader source from file
-// -------------------------
 std::string loadShaderSource(const char *path) {
     std::ifstream file(path);
     if (!file.is_open()) {
@@ -128,9 +134,7 @@ std::string loadShaderSource(const char *path) {
     return ss.str();
 }
 
-// -------------------------
 // Compile a single shader
-// -------------------------
 GLuint compileShader(GLenum type, const std::string &source) {
     GLuint shader = glCreateShader(type);
     const char *src = source.c_str();
@@ -150,9 +154,7 @@ GLuint compileShader(GLenum type, const std::string &source) {
     return shader;
 }
 
-// -------------------------
-// Link vertex and fragment shaders into a program
-// -------------------------
+// Link vertex + fragment shaders into a program
 GLuint createShaderProgram(const char *vsPath, const char *fsPath) {
     std::string vsSource = loadShaderSource(vsPath);
     std::string fsSource = loadShaderSource(fsPath);
@@ -165,7 +167,6 @@ GLuint createShaderProgram(const char *vsPath, const char *fsPath) {
     glAttachShader(program, fragmentShader);
     glLinkProgram(program);
 
-    // Optional: Check link status
     GLint success = 0;
     glGetProgramiv(program, GL_LINK_STATUS, &success);
     if (!success) {
@@ -179,9 +180,7 @@ GLuint createShaderProgram(const char *vsPath, const char *fsPath) {
     return program;
 }
 
-// -------------------------
-// Generate vertices and indices for a UV sphere
-// -------------------------
+// Generate a UV sphere mesh
 void generateSphereMesh(std::vector<float> &vertices,
                         std::vector<unsigned int> &indices, float radius,
                         int sectorCount, int stackCount) {
@@ -225,15 +224,12 @@ void generateSphereMesh(std::vector<float> &vertices,
     }
 }
 
-// -------------------------
 // Load a 2D texture from file
-// -------------------------
 GLuint loadTexture(const char *filePath) {
     GLuint textureID;
     glGenTextures(1, &textureID);
     glBindTexture(GL_TEXTURE_2D, textureID);
 
-    // Set texture parameters
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -254,15 +250,70 @@ GLuint loadTexture(const char *filePath) {
     return textureID;
 }
 
-// -------------------------
+// Setup the VAO/VBO for the trail
+void setupTrailBuffers() {
+    glGenVertexArrays(1, &trailVAO);
+    glGenBuffers(1, &trailVBO);
+
+    glBindVertexArray(trailVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, trailVBO);
+
+    glBufferData(GL_ARRAY_BUFFER,
+                 MAX_TRAIL_POINTS * (sizeof(glm::vec3) + sizeof(float)),
+                 nullptr, GL_DYNAMIC_DRAW);
+
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE,
+                          sizeof(glm::vec3) + sizeof(float), (void *)0);
+    glEnableVertexAttribArray(0);
+
+    glVertexAttribPointer(1, 1, GL_FLOAT, GL_FALSE,
+                          sizeof(glm::vec3) + sizeof(float),
+                          (void *)sizeof(glm::vec3));
+    glEnableVertexAttribArray(1);
+
+    glBindVertexArray(0);
+}
+
+// Update trail: sample, age, remove expired, upload
+void updateTrail(float dt) {
+    sampleAccumulator += dt;
+    while (sampleAccumulator >= SAMPLE_INTERVAL) {
+        sampleAccumulator -= SAMPLE_INTERVAL;
+        earthTrail.push_back({earthPos, POINT_LIFETIME});
+    }
+
+    for (auto &tp : earthTrail) {
+        tp.life -= dt;
+    }
+
+    earthTrail.erase(
+        std::remove_if(earthTrail.begin(), earthTrail.end(),
+                       [](const TrailPoint &tp) { return tp.life <= 0.0f; }),
+        earthTrail.end());
+
+    std::vector<float> bufferData;
+    bufferData.reserve(earthTrail.size() * 4);
+    for (auto &tp : earthTrail) {
+        float lifeFrac = tp.life / POINT_LIFETIME;
+        lifeFrac = std::max(lifeFrac, 0.0f);
+        bufferData.push_back(tp.pos.x);
+        bufferData.push_back(tp.pos.y);
+        bufferData.push_back(tp.pos.z);
+        bufferData.push_back(lifeFrac);
+    }
+
+    glBindBuffer(GL_ARRAY_BUFFER, trailVBO);
+    glBufferSubData(GL_ARRAY_BUFFER, 0,
+                    static_cast<GLsizeiptr>(bufferData.size() * sizeof(float)),
+                    bufferData.data());
+}
+
 // Main Entry Point
-// -------------------------
 int main() {
     if (!glfwInit()) {
         std::cerr << "Failed to initialize GLFW.\n";
         return -1;
     }
-
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 5);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
@@ -274,12 +325,11 @@ int main() {
         glfwTerminate();
         return -1;
     }
-
     glfwSetCursorPosCallback(window, mouseCallback);
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-
     glfwMakeContextCurrent(window);
     glfwSwapInterval(1);
+
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
         std::cerr << "Failed to initialize GLAD.\n";
         glfwDestroyWindow(window);
@@ -330,18 +380,11 @@ int main() {
     GLuint earthTexture = loadTexture("textures/dirt.jpg");
 
     glEnable(GL_DEPTH_TEST);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glEnable(GL_PROGRAM_POINT_SIZE);
 
-    glGenVertexArrays(1, &trailVAO);
-    glGenBuffers(1, &trailVBO);
-    glBindVertexArray(trailVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, trailVBO);
-    glBufferData(GL_ARRAY_BUFFER, TRAIL_LIMIT * sizeof(glm::vec3), nullptr,
-                 GL_DYNAMIC_DRAW);
-
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(glm::vec3),
-                          (void *)0);
-    glEnableVertexAttribArray(0);
-    glBindVertexArray(0);
+    setupTrailBuffers();
 
     while (!glfwWindowShouldClose(window)) {
         glfwGetFramebufferSize(window, &screenWidth, &screenHeight);
@@ -353,18 +396,18 @@ int main() {
 
         processInput(window);
 
-        earthTrail.push_back(earthPos);
-        if (earthTrail.size() > TRAIL_LIMIT) {
-            earthTrail.erase(earthTrail.begin());
+        {
+            glm::vec3 direction = sunPos - earthPos;
+            float distance = glm::length(direction);
+            glm::vec3 forceDir = glm::normalize(direction);
+            float forceMag =
+                G_CONST * SUN_MASS * EARTH_MASS / (distance * distance);
+            glm::vec3 acceleration = forceDir * (forceMag / EARTH_MASS);
+            earthVel += acceleration * deltaTime;
+            earthPos += earthVel * deltaTime;
         }
-        glm::vec3 direction = sunPos - earthPos;
-        float distance = glm::length(direction);
-        glm::vec3 forceDir = glm::normalize(direction);
-        float forceMag =
-            G_CONST * SUN_MASS * EARTH_MASS / (distance * distance);
-        glm::vec3 acceleration = forceDir * (forceMag / EARTH_MASS);
-        earthVel += acceleration * deltaTime;
-        earthPos += earthVel * deltaTime;
+
+        updateTrail(deltaTime);
 
         glm::mat4 view =
             glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
@@ -375,44 +418,54 @@ int main() {
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+        // Draw Sun
         glUseProgram(mainShader);
         glBindVertexArray(sphereVAO);
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, sunTexture);
-        glm::mat4 modelSun = glm::scale(glm::mat4(1.0f), glm::vec3(1.5f));
-        glm::mat4 mvpSun = proj * view * modelSun;
-        glUniformMatrix4fv(mainMVP_Loc, 1, GL_FALSE, glm::value_ptr(mvpSun));
-        glUniform1i(mainTex_Loc, 0);
-        glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(sphereIndices.size()),
-                       GL_UNSIGNED_INT, nullptr);
+        {
+            glm::mat4 modelSun = glm::scale(glm::mat4(1.0f), glm::vec3(1.5f));
+            glm::mat4 mvpSun = proj * view * modelSun;
+            glUniformMatrix4fv(mainMVP_Loc, 1, GL_FALSE,
+                               glm::value_ptr(mvpSun));
+            glUniform1i(mainTex_Loc, 0);
+            glDrawElements(GL_TRIANGLES,
+                           static_cast<GLsizei>(sphereIndices.size()),
+                           GL_UNSIGNED_INT, nullptr);
+        }
 
-        glBindTexture(GL_TEXTURE_2D, earthTexture);
-        glm::mat4 modelEarth = glm::translate(glm::mat4(1.0f), earthPos);
-        modelEarth = glm::scale(modelEarth, glm::vec3(0.5f));
-        glm::mat4 mvpEarth = proj * view * modelEarth;
-        glUniformMatrix4fv(mainMVP_Loc, 1, GL_FALSE, glm::value_ptr(mvpEarth));
-        glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(sphereIndices.size()),
-                       GL_UNSIGNED_INT, nullptr);
+        // Draw Earth
+        {
+            glBindTexture(GL_TEXTURE_2D, earthTexture);
+            glm::mat4 modelEarth = glm::translate(glm::mat4(1.0f), earthPos);
+            modelEarth = glm::scale(modelEarth, glm::vec3(0.5f));
+            glm::mat4 mvpEarth = proj * view * modelEarth;
+            glUniformMatrix4fv(mainMVP_Loc, 1, GL_FALSE,
+                               glm::value_ptr(mvpEarth));
+            glDrawElements(GL_TRIANGLES,
+                           static_cast<GLsizei>(sphereIndices.size()),
+                           GL_UNSIGNED_INT, nullptr);
+        }
 
-        glBindBuffer(GL_ARRAY_BUFFER, trailVBO);
-        glBufferSubData(GL_ARRAY_BUFFER, 0,
-                        earthTrail.size() * sizeof(glm::vec3),
-                        earthTrail.data());
-
+        // Draw Trail as fading dots
         glUseProgram(trailShader);
         glBindVertexArray(trailVAO);
+        {
+            glm::mat4 mvpTrail = proj * view * glm::mat4(1.0f);
+            glUniformMatrix4fv(trailMVP_Loc, 1, GL_FALSE,
+                               glm::value_ptr(mvpTrail));
 
-        glm::mat4 mvpTrail = proj * view * glm::mat4(1.0f);
-        glUniformMatrix4fv(trailMVP_Loc, 1, GL_FALSE, glm::value_ptr(mvpTrail));
-
-        int count = static_cast<int>(earthTrail.size());
-        for (int i = 0; i + 1 < count; i += 6) {
-            glDrawArrays(GL_LINES, i, 2);
+            int count = static_cast<int>(earthTrail.size());
+            float pointSize = 4.0f;
+            glPointSize(pointSize);
+            glDrawArrays(GL_POINTS, 0, count);
         }
+
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
 
+    // Cleanup
     glDeleteVertexArrays(1, &sphereVAO);
     glDeleteBuffers(1, &sphereVBO);
     glDeleteBuffers(1, &sphereEBO);

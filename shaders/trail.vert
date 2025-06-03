@@ -1,9 +1,15 @@
 
 #version 450 core
-layout (location = 0) in vec3 aPos;
 
+layout(location = 0) in vec3 a_Pos;       // world‐space position of each dot
+layout(location = 1) in float a_LifeFrac; // normalized life ∈ [0..1]
+
+layout(location = 0) out float v_LifeFrac;
 uniform mat4 u_MVP;
 
 void main() {
-    gl_Position = u_MVP * vec4(aPos, 1.0);
+    v_LifeFrac  = a_LifeFrac;
+    gl_Position = u_MVP * vec4(a_Pos, 1.0);
+    // We set gl_PointSize from C++ with glPointSize(...).
 }
+
