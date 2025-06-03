@@ -1,3 +1,6 @@
+#include <glm/fwd.hpp>
+#include <glm/trigonometric.hpp>
+#include <vector>
 #define STB_IMAGE_IMPLEMENTATION
 #include <GLFW/glfw3.h>
 #include <glad/glad.h>
@@ -69,10 +72,7 @@ void mouse_callback(GLFWwindow *window, double xpos, double ypos) {
   yaw += xoffset;
   pitch += yoffset;
 
-  if (pitch > 89.0f)
-    pitch = 89.0f;
-  if (pitch < -89.0f)
-    pitch = -89.0f;
+  pitch = glm::clamp(pitch, -89.0f, 89.0f);
 
   glm::vec3 direction;
   direction.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
@@ -134,38 +134,50 @@ GLuint create_shader_program(const char *vs_path, const char *fs_path) {
 }
 
 // -------------------------
-// Vertex Data (Cube)
+// Vertex Data (Sphere)
 // -------------------------
-float cubeVertices[] = {
-    -0.5f, -0.5f, -0.5f, 0.0f, 0.0f, 0.5f,  -0.5f, -0.5f, 1.0f, 0.0f,
-    0.5f,  0.5f,  -0.5f, 1.0f, 1.0f, 0.5f,  0.5f,  -0.5f, 1.0f, 1.0f,
-    -0.5f, 0.5f,  -0.5f, 0.0f, 1.0f, -0.5f, -0.5f, -0.5f, 0.0f, 0.0f,
+void generateSphereMesh(std::vector<float> &vertices,
+                        std::vector<unsigned int> &indices, float radius = 1.0f,
+                        int sectorCount = 36, int stackCount = 18) {
+  for (int i = 0; i <= stackCount; ++i) {
+    float stackAngle = glm::pi<float>() / 2 - i * glm::pi<float>() / stackCount;
+    float xy = radius * cos(stackAngle);
+    float z = radius * sin(stackAngle);
 
-    -0.5f, -0.5f, 0.5f,  0.0f, 0.0f, 0.5f,  -0.5f, 0.5f,  1.0f, 0.0f,
-    0.5f,  0.5f,  0.5f,  1.0f, 1.0f, 0.5f,  0.5f,  0.5f,  1.0f, 1.0f,
-    -0.5f, 0.5f,  0.5f,  0.0f, 1.0f, -0.5f, -0.5f, 0.5f,  0.0f, 0.0f,
+    for (int j = 0; j <= sectorCount; ++j) {
+      float sectorAngle = j * 2 * glm::pi<float>() / sectorCount;
 
-    -0.5f, 0.5f,  0.5f,  1.0f, 0.0f, -0.5f, 0.5f,  -0.5f, 1.0f, 1.0f,
-    -0.5f, -0.5f, -0.5f, 0.0f, 1.0f, -0.5f, -0.5f, -0.5f, 0.0f, 1.0f,
-    -0.5f, -0.5f, 0.5f,  0.0f, 0.0f, -0.5f, 0.5f,  0.5f,  1.0f, 0.0f,
+      float x = xy * cos(sectorAngle);
+      float y = xy * sin(sectorAngle);
+      float u = (float)j / sectorCount;
+      float v = (float)i / stackCount;
 
-    0.5f,  0.5f,  0.5f,  1.0f, 0.0f, 0.5f,  0.5f,  -0.5f, 1.0f, 1.0f,
-    0.5f,  -0.5f, -0.5f, 0.0f, 1.0f, 0.5f,  -0.5f, -0.5f, 0.0f, 1.0f,
-    0.5f,  -0.5f, 0.5f,  0.0f, 0.0f, 0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+      vertices.insert(vertices.end(), {x, y, z, u, v});
+    }
+  }
 
-    -0.5f, -0.5f, -0.5f, 0.0f, 1.0f, 0.5f,  -0.5f, -0.5f, 1.0f, 1.0f,
-    0.5f,  -0.5f, 0.5f,  1.0f, 0.0f, 0.5f,  -0.5f, 0.5f,  1.0f, 0.0f,
-    -0.5f, -0.5f, 0.5f,  0.0f, 0.0f, -0.5f, -0.5f, -0.5f, 0.0f, 1.0f,
+  for (int i = 0; i < stackCount; ++i) {
+    int k1 = i * (sectorCount + 1);
+    int k2 = k1 + sectorCount + 1;
 
-    -0.5f, 0.5f,  -0.5f, 0.0f, 1.0f, 0.5f,  0.5f,  -0.5f, 1.0f, 1.0f,
-    0.5f,  0.5f,  0.5f,  1.0f, 0.0f, 0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-    -0.5f, 0.5f,  0.5f,  0.0f, 0.0f, -0.5f, 0.5f,  -0.5f, 0.0f, 1.0f};
-
+    for (int j = 0; j < sectorCount; ++j, ++k1, ++k2) {
+      if (i != 0) {
+        indices.insert(indices.end(), {static_cast<unsigned int>(k1),
+                                       static_cast<unsigned int>(k2),
+                                       static_cast<unsigned int>(k1 + 1)});
+      }
+      if (i != (stackCount - 1)) {
+        indices.insert(indices.end(), {static_cast<unsigned int>(k1 + 1),
+                                       static_cast<unsigned int>(k2),
+                                       static_cast<unsigned int>(k2 + 1)});
+      }
+    }
+  }
+}
 // -------------------------
 // Main
 // -------------------------
 int main() {
-  // Initialize GLFW
   if (!glfwInit())
     return -1;
 
@@ -184,24 +196,32 @@ int main() {
   glfwMakeContextCurrent(window);
   gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
 
-  // Set viewport size
   int width, height;
   glfwGetFramebufferSize(window, &width, &height);
   glViewport(0, 0, width, height);
 
-  // Compile shaders
   GLuint shaderProgram =
       create_shader_program("shaders/vertex.glsl", "shaders/fragment.glsl");
 
-  // Setup VAO/VBO
-  GLuint VAO, VBO;
+  std::vector<float> sphereVertices;
+  std::vector<unsigned int> sphereIndices;
+  generateSphereMesh(sphereVertices, sphereIndices);
+
+  GLuint VAO, VBO, EBO;
   glGenVertexArrays(1, &VAO);
   glGenBuffers(1, &VBO);
+  glGenBuffers(1, &EBO);
 
   glBindVertexArray(VAO);
+
   glBindBuffer(GL_ARRAY_BUFFER, VBO);
-  glBufferData(GL_ARRAY_BUFFER, sizeof(cubeVertices), cubeVertices,
-               GL_STATIC_DRAW);
+  glBufferData(GL_ARRAY_BUFFER, sphereVertices.size() * sizeof(float),
+               sphereVertices.data(), GL_STATIC_DRAW);
+
+  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+  glBufferData(GL_ELEMENT_ARRAY_BUFFER,
+               sphereIndices.size() * sizeof(unsigned int),
+               sphereIndices.data(), GL_STATIC_DRAW);
 
   glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void *)0);
   glEnableVertexAttribArray(0);
@@ -209,7 +229,6 @@ int main() {
                         (void *)(3 * sizeof(float)));
   glEnableVertexAttribArray(1);
 
-  // Load texture
   GLuint texture;
   glGenTextures(1, &texture);
   glBindTexture(GL_TEXTURE_2D, texture);
@@ -221,7 +240,7 @@ int main() {
   int texWidth, texHeight, texChannels;
   stbi_set_flip_vertically_on_load(true);
   unsigned char *data =
-      stbi_load("textures/anger.jpg", &texWidth, &texHeight, &texChannels, 0);
+      stbi_load("textures/earth.jpeg", &texWidth, &texHeight, &texChannels, 0);
   if (data) {
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, texWidth, texHeight, 0, GL_RGB,
                  GL_UNSIGNED_BYTE, data);
@@ -235,7 +254,6 @@ int main() {
   GLint mvpLoc = glGetUniformLocation(shaderProgram, "u_MVP");
   GLint texLoc = glGetUniformLocation(shaderProgram, "u_Texture");
 
-  // Main render loop
   while (!glfwWindowShouldClose(window)) {
     glfwGetFramebufferSize(window, &width, &height);
     glViewport(0, 0, width, height);
@@ -245,10 +263,12 @@ int main() {
     lastFrame = currentFrame;
     processInput(window);
 
-    // Create transformation matrices
     float time = glfwGetTime();
     glm::mat4 model =
-        glm::rotate(glm::mat4(1.0f), time, glm::vec3(0.3f, 1.0f, 0.0f));
+        glm::rotate(glm::mat4(1.0f), time, glm::vec3(0.0f, 1.0f, 0.0f));
+
+    model =
+        glm::rotate(model, glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
 
     glm::mat4 view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
 
@@ -259,7 +279,6 @@ int main() {
     glClearColor(0.1f, 0.1f, 0.2f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    // Use shaders and draw
     glUseProgram(shaderProgram);
     glUniformMatrix4fv(mvpLoc, 1, GL_FALSE, glm::value_ptr(mvp));
     glUniform1i(texLoc, 0);
@@ -267,13 +286,13 @@ int main() {
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, texture);
     glBindVertexArray(VAO);
-    glDrawArrays(GL_TRIANGLES, 0, 36);
+
+    glDrawElements(GL_TRIANGLES, sphereIndices.size(), GL_UNSIGNED_INT, 0);
 
     glfwSwapBuffers(window);
     glfwPollEvents();
   }
 
-  // Cleanup
   glDeleteVertexArrays(1, &VAO);
   glDeleteBuffers(1, &VBO);
   glDeleteTextures(1, &texture);
