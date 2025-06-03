@@ -1,40 +1,71 @@
-#include <glm/fwd.hpp>
-#include <glm/trigonometric.hpp>
-#include <vector>
-#define STB_IMAGE_IMPLEMENTATION
 #include <GLFW/glfw3.h>
 #include <glad/glad.h>
+#include <glm/fwd.hpp>
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
+#define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
 #include <fstream>
 #include <iostream>
 #include <sstream>
 #include <stdexcept>
+#include <vector>
 
-glm::vec3 cameraPos = glm::vec3(0.0f, 0.0f, 3.0f);
-glm::vec3 cameraFront = glm::vec3(0.0f, 0.0f, -1.0f);
-glm::vec3 cameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
+// -------------------------
+// Constants and Globals
+// -------------------------
+static constexpr size_t TRAIL_LIMIT = 500;
+static constexpr float G_CONST = 0.5f;
+static constexpr float SUN_MASS = 10000.0f;
+static constexpr float EARTH_MASS = 1.0f;
+static constexpr float EARTH_DISTANCE = 20.0f;
+static const float EARTH_SPEED = std::sqrt(G_CONST * SUN_MASS / EARTH_DISTANCE);
 
-float yaw = -90.0f;
-float pitch = 0.0f;
-float lastX = 400.0f;
-float lastY = 300.0f;
-bool firstMouse = true;
+static std::vector<glm::vec3> earthTrail;
+static GLuint trailVAO = 0, trailVBO = 0;
 
-float deltaTime = 0.0f;
-float lastFrame = 0.0f;
+static glm::vec3 sunPos = glm::vec3(0.0f);
+static glm::vec3 earthPos = glm::vec3(EARTH_DISTANCE, 0.0f, 0.0f);
+static glm::vec3 earthVel = glm::vec3(0.0f, 0.0f, EARTH_SPEED);
 
+// Camera state
+static glm::vec3 cameraPos = glm::vec3(0.0f, 0.0f, 3.0f);
+static glm::vec3 cameraFront = glm::vec3(0.0f, 0.0f, -1.0f);
+static glm::vec3 cameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
+
+static float yaw = -90.0f;
+static float pitch = 0.0f;
+static float lastX = 400.0f;
+static float lastY = 300.0f;
+static bool firstMouse = true;
+
+static float deltaTime = 0.0f;
+static float lastFrame = 0.0f;
+
+// -------------------------
+// Function Declarations
+// -------------------------
+void processInput(GLFWwindow *window);
+void mouseCallback(GLFWwindow *window, double xpos, double ypos);
+std::string loadShaderSource(const char *path);
+GLuint compileShader(GLenum type, const std::string &source);
+GLuint createShaderProgram(const char *vsPath, const char *fsPath);
+void generateSphereMesh(std::vector<float> &vertices,
+                        std::vector<unsigned int> &indices, float radius = 1.0f,
+                        int sectorCount = 36, int stackCount = 18);
+GLuint loadTexture(const char *filePath);
+
+// -------------------------
+// Process keyboard input
+// -------------------------
 void processInput(GLFWwindow *window) {
     float baseSpeed = 2.5f;
-    float speedMultiplier = 1.0f;
-
-    if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS)
-        speedMultiplier = 3.0f;
+    float speedMultiplier =
+        (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) ? 3.0f : 1.0f;
     float cameraSpeed = baseSpeed * speedMultiplier * deltaTime;
 
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
@@ -53,176 +84,236 @@ void processInput(GLFWwindow *window) {
         cameraPos -= cameraSpeed * cameraUp;
 }
 
-void mouse_callback(GLFWwindow *window, double xpos, double ypos) {
+// -------------------------
+// Mouse movement callback
+// -------------------------
+void mouseCallback(GLFWwindow *window, double xpos, double ypos) {
     if (firstMouse) {
-        lastX = xpos;
-        lastY = ypos;
+        lastX = static_cast<float>(xpos);
+        lastY = static_cast<float>(ypos);
         firstMouse = false;
     }
 
-    float xoffset = xpos - lastX;
-    float yoffset = lastY - ypos;
-    lastX = xpos;
-    lastY = ypos;
+    float xOffset = static_cast<float>(xpos) - lastX;
+    float yOffset = lastY - static_cast<float>(ypos);
+    lastX = static_cast<float>(xpos);
+    lastY = static_cast<float>(ypos);
 
     float sensitivity = 0.1f;
-    xoffset *= sensitivity;
-    yoffset *= sensitivity;
+    xOffset *= sensitivity;
+    yOffset *= sensitivity;
 
-    yaw += xoffset;
-    pitch += yoffset;
-
+    yaw += xOffset;
+    pitch += yOffset;
     pitch = glm::clamp(pitch, -89.0f, 89.0f);
 
     glm::vec3 direction;
-    direction.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
-    direction.y = sin(glm::radians(pitch));
-    direction.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
+    direction.x = std::cos(glm::radians(yaw)) * std::cos(glm::radians(pitch));
+    direction.y = std::sin(glm::radians(pitch));
+    direction.z = std::sin(glm::radians(yaw)) * std::cos(glm::radians(pitch));
     cameraFront = glm::normalize(direction);
 }
 
 // -------------------------
-// Utility: Load shader file
+// Load shader source from file
 // -------------------------
-std::string load_shader(const char *path) {
+std::string loadShaderSource(const char *path) {
     std::ifstream file(path);
-    if (!file.is_open())
-        throw std::runtime_error("Failed to open shader file.");
+    if (!file.is_open()) {
+        throw std::runtime_error("Failed to open shader file: " +
+                                 std::string(path));
+    }
     std::stringstream ss;
     ss << file.rdbuf();
     return ss.str();
 }
 
 // -------------------------
-// Utility: Compile shader
+// Compile a single shader
 // -------------------------
-GLuint compile_shader(GLenum type, const std::string &source) {
+GLuint compileShader(GLenum type, const std::string &source) {
     GLuint shader = glCreateShader(type);
     const char *src = source.c_str();
     glShaderSource(shader, 1, &src, nullptr);
     glCompileShader(shader);
 
-    int success;
+    GLint success = 0;
     glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
     if (!success) {
-        char log[512];
-        glGetShaderInfoLog(shader, 512, nullptr, log);
-        std::cerr << "Shader Compile Error: " << log << "\n";
+        char infoLog[512];
+        glGetShaderInfoLog(shader, 512, nullptr, infoLog);
+        std::cerr << "Shader Compilation Error ("
+                  << (type == GL_VERTEX_SHADER ? "VERTEX" : "FRAGMENT")
+                  << "):\n"
+                  << infoLog << "\n";
     }
-
     return shader;
 }
 
 // -------------------------
-// Utility: Link shader program
+// Link vertex and fragment shaders into a program
 // -------------------------
-GLuint create_shader_program(const char *vs_path, const char *fs_path) {
-    auto vs_src = load_shader(vs_path);
-    auto fs_src = load_shader(fs_path);
-    GLuint vs = compile_shader(GL_VERTEX_SHADER, vs_src);
-    GLuint fs = compile_shader(GL_FRAGMENT_SHADER, fs_src);
+GLuint createShaderProgram(const char *vsPath, const char *fsPath) {
+    std::string vsSource = loadShaderSource(vsPath);
+    std::string fsSource = loadShaderSource(fsPath);
+
+    GLuint vertexShader = compileShader(GL_VERTEX_SHADER, vsSource);
+    GLuint fragmentShader = compileShader(GL_FRAGMENT_SHADER, fsSource);
 
     GLuint program = glCreateProgram();
-    glAttachShader(program, vs);
-    glAttachShader(program, fs);
+    glAttachShader(program, vertexShader);
+    glAttachShader(program, fragmentShader);
     glLinkProgram(program);
 
-    glDeleteShader(vs);
-    glDeleteShader(fs);
+    // Optional: Check link status
+    GLint success = 0;
+    glGetProgramiv(program, GL_LINK_STATUS, &success);
+    if (!success) {
+        char infoLog[512];
+        glGetProgramInfoLog(program, 512, nullptr, infoLog);
+        std::cerr << "Shader Program Linking Error:\n" << infoLog << "\n";
+    }
 
+    glDeleteShader(vertexShader);
+    glDeleteShader(fragmentShader);
     return program;
 }
 
 // -------------------------
-// Vertex Data (Sphere)
+// Generate vertices and indices for a UV sphere
 // -------------------------
 void generateSphereMesh(std::vector<float> &vertices,
-                        std::vector<unsigned int> &indices, float radius = 1.0f,
-                        int sectorCount = 36, int stackCount = 18) {
+                        std::vector<unsigned int> &indices, float radius,
+                        int sectorCount, int stackCount) {
+    const float PI = glm::pi<float>();
+
     for (int i = 0; i <= stackCount; ++i) {
-        float stackAngle =
-            glm::pi<float>() / 2 - i * glm::pi<float>() / stackCount;
-        float xy = radius * cos(stackAngle);
-        float z = radius * sin(stackAngle);
+        float stackAngle = PI / 2 - i * PI / stackCount;
+        float xy = radius * std::cos(stackAngle);
+        float z = radius * std::sin(stackAngle);
 
         for (int j = 0; j <= sectorCount; ++j) {
-            float sectorAngle = j * 2 * glm::pi<float>() / sectorCount;
+            float sectorAngle = j * 2 * PI / sectorCount;
+            float x = xy * std::cos(sectorAngle);
+            float y = xy * std::sin(sectorAngle);
+            float u = static_cast<float>(j) / sectorCount;
+            float v = static_cast<float>(i) / stackCount;
 
-            float x = xy * cos(sectorAngle);
-            float y = xy * sin(sectorAngle);
-            float u = (float)j / sectorCount;
-            float v = (float)i / stackCount;
-
-            vertices.insert(vertices.end(), {x, y, z, u, v});
+            vertices.push_back(x);
+            vertices.push_back(y);
+            vertices.push_back(z);
+            vertices.push_back(u);
+            vertices.push_back(v);
         }
     }
 
     for (int i = 0; i < stackCount; ++i) {
         int k1 = i * (sectorCount + 1);
         int k2 = k1 + sectorCount + 1;
-
         for (int j = 0; j < sectorCount; ++j, ++k1, ++k2) {
             if (i != 0) {
-                indices.insert(indices.end(),
-                               {static_cast<unsigned int>(k1),
-                                static_cast<unsigned int>(k2),
-                                static_cast<unsigned int>(k1 + 1)});
+                indices.push_back(k1);
+                indices.push_back(k2);
+                indices.push_back(k1 + 1);
             }
             if (i != (stackCount - 1)) {
-                indices.insert(indices.end(),
-                               {static_cast<unsigned int>(k1 + 1),
-                                static_cast<unsigned int>(k2),
-                                static_cast<unsigned int>(k2 + 1)});
+                indices.push_back(k1 + 1);
+                indices.push_back(k2);
+                indices.push_back(k2 + 1);
             }
         }
     }
 }
+
 // -------------------------
-// Main
+// Load a 2D texture from file
+// -------------------------
+GLuint loadTexture(const char *filePath) {
+    GLuint textureID;
+    glGenTextures(1, &textureID);
+    glBindTexture(GL_TEXTURE_2D, textureID);
+
+    // Set texture parameters
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    int width, height, channels;
+    stbi_set_flip_vertically_on_load(true);
+    unsigned char *data = stbi_load(filePath, &width, &height, &channels, 0);
+    if (data) {
+        GLenum format = (channels == 4 ? GL_RGBA : GL_RGB);
+        glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format,
+                     GL_UNSIGNED_BYTE, data);
+        glGenerateMipmap(GL_TEXTURE_2D);
+    } else {
+        std::cerr << "Failed to load texture: " << filePath << "\n";
+    }
+    stbi_image_free(data);
+    return textureID;
+}
+
+// -------------------------
+// Main Entry Point
 // -------------------------
 int main() {
-    if (!glfwInit())
+    if (!glfwInit()) {
+        std::cerr << "Failed to initialize GLFW.\n";
         return -1;
+    }
 
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 5);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
     GLFWwindow *window =
-        glfwCreateWindow(800, 600, "OpenGL Cube", nullptr, nullptr);
-    if (!window)
+        glfwCreateWindow(800, 600, "Earth-Sun Simulation", nullptr, nullptr);
+    if (!window) {
+        std::cerr << "Failed to create GLFW window.\n";
+        glfwTerminate();
         return -1;
+    }
 
-    glfwSetCursorPosCallback(window, mouse_callback);
+    glfwSetCursorPosCallback(window, mouseCallback);
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
     glfwMakeContextCurrent(window);
     glfwSwapInterval(1);
-    gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
+    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
+        std::cerr << "Failed to initialize GLAD.\n";
+        glfwDestroyWindow(window);
+        glfwTerminate();
+        return -1;
+    }
 
-    int width, height;
-    glfwGetFramebufferSize(window, &width, &height);
-    glViewport(0, 0, width, height);
+    int screenWidth, screenHeight;
+    glfwGetFramebufferSize(window, &screenWidth, &screenHeight);
+    glViewport(0, 0, screenWidth, screenHeight);
 
-    GLuint shaderProgram =
-        create_shader_program("shaders/vertex.glsl", "shaders/fragment.glsl");
+    GLuint trailShader =
+        createShaderProgram("shaders/trail.vert", "shaders/trail.frag");
+    GLuint mainShader =
+        createShaderProgram("shaders/vertex.glsl", "shaders/fragment.glsl");
+    GLint trailMVP_Loc = glGetUniformLocation(trailShader, "u_MVP");
+    GLint mainMVP_Loc = glGetUniformLocation(mainShader, "u_MVP");
+    GLint mainTex_Loc = glGetUniformLocation(mainShader, "u_Texture");
 
     std::vector<float> sphereVertices;
     std::vector<unsigned int> sphereIndices;
     generateSphereMesh(sphereVertices, sphereIndices);
 
-    GLuint VAO, VBO, EBO;
-    glGenVertexArrays(1, &VAO);
-    glGenBuffers(1, &VBO);
-    glGenBuffers(1, &EBO);
+    GLuint sphereVAO, sphereVBO, sphereEBO;
+    glGenVertexArrays(1, &sphereVAO);
+    glGenBuffers(1, &sphereVBO);
+    glGenBuffers(1, &sphereEBO);
 
-    glBindVertexArray(VAO);
-
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    glBindVertexArray(sphereVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, sphereVBO);
     glBufferData(GL_ARRAY_BUFFER, sphereVertices.size() * sizeof(float),
                  sphereVertices.data(), GL_STATIC_DRAW);
 
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, sphereEBO);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER,
                  sphereIndices.size() * sizeof(unsigned int),
                  sphereIndices.data(), GL_STATIC_DRAW);
@@ -233,76 +324,105 @@ int main() {
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float),
                           (void *)(3 * sizeof(float)));
     glEnableVertexAttribArray(1);
+    glBindVertexArray(0);
 
-    GLuint texture;
-    glGenTextures(1, &texture);
-    glBindTexture(GL_TEXTURE_2D, texture);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-    int texWidth, texHeight, texChannels;
-    stbi_set_flip_vertically_on_load(true);
-    unsigned char *data = stbi_load("textures/earth.jpeg", &texWidth,
-                                    &texHeight, &texChannels, 0);
-    if (data) {
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, texWidth, texHeight, 0, GL_RGB,
-                     GL_UNSIGNED_BYTE, data);
-        glGenerateMipmap(GL_TEXTURE_2D);
-    } else {
-        std::cerr << "Failed to load texture\n";
-    }
-    stbi_image_free(data);
+    GLuint sunTexture = loadTexture("textures/lava.png");
+    GLuint earthTexture = loadTexture("textures/dirt.jpg");
 
     glEnable(GL_DEPTH_TEST);
-    GLint mvpLoc = glGetUniformLocation(shaderProgram, "u_MVP");
-    GLint texLoc = glGetUniformLocation(shaderProgram, "u_Texture");
+
+    glGenVertexArrays(1, &trailVAO);
+    glGenBuffers(1, &trailVBO);
+    glBindVertexArray(trailVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, trailVBO);
+    glBufferData(GL_ARRAY_BUFFER, TRAIL_LIMIT * sizeof(glm::vec3), nullptr,
+                 GL_DYNAMIC_DRAW);
+
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(glm::vec3),
+                          (void *)0);
+    glEnableVertexAttribArray(0);
+    glBindVertexArray(0);
 
     while (!glfwWindowShouldClose(window)) {
-        glfwGetFramebufferSize(window, &width, &height);
-        glViewport(0, 0, width, height);
+        glfwGetFramebufferSize(window, &screenWidth, &screenHeight);
+        glViewport(0, 0, screenWidth, screenHeight);
 
-        float currentFrame = glfwGetTime();
-        deltaTime = currentFrame - lastFrame;
+        float currentFrame = static_cast<float>(glfwGetTime());
+        deltaTime = std::min(currentFrame - lastFrame, 0.05f);
         lastFrame = currentFrame;
+
         processInput(window);
 
-        float time = glfwGetTime();
-        glm::mat4 model =
-            glm::rotate(glm::mat4(1.0f), time, glm::vec3(0.0f, 1.0f, 0.0f));
-
-        model = glm::rotate(model, glm::radians(90.0f),
-                            glm::vec3(1.0f, 0.0f, 0.0f));
+        earthTrail.push_back(earthPos);
+        if (earthTrail.size() > TRAIL_LIMIT) {
+            earthTrail.erase(earthTrail.begin());
+        }
+        glm::vec3 direction = sunPos - earthPos;
+        float distance = glm::length(direction);
+        glm::vec3 forceDir = glm::normalize(direction);
+        float forceMag =
+            G_CONST * SUN_MASS * EARTH_MASS / (distance * distance);
+        glm::vec3 acceleration = forceDir * (forceMag / EARTH_MASS);
+        earthVel += acceleration * deltaTime;
+        earthPos += earthVel * deltaTime;
 
         glm::mat4 view =
             glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
+        glm::mat4 proj = glm::perspective(
+            glm::radians(45.0f), static_cast<float>(screenWidth) / screenHeight,
+            0.1f, 100.0f);
 
-        glm::mat4 proj = glm::perspective(glm::radians(45.0f),
-                                          (float)width / height, 0.1f, 100.0f);
-        glm::mat4 mvp = proj * view * model;
-
-        glClearColor(0.1f, 0.1f, 0.2f, 1.0f);
+        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        glUseProgram(shaderProgram);
-        glUniformMatrix4fv(mvpLoc, 1, GL_FALSE, glm::value_ptr(mvp));
-        glUniform1i(texLoc, 0);
-
+        glUseProgram(mainShader);
+        glBindVertexArray(sphereVAO);
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, texture);
-        glBindVertexArray(VAO);
+        glBindTexture(GL_TEXTURE_2D, sunTexture);
+        glm::mat4 modelSun = glm::scale(glm::mat4(1.0f), glm::vec3(1.5f));
+        glm::mat4 mvpSun = proj * view * modelSun;
+        glUniformMatrix4fv(mainMVP_Loc, 1, GL_FALSE, glm::value_ptr(mvpSun));
+        glUniform1i(mainTex_Loc, 0);
+        glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(sphereIndices.size()),
+                       GL_UNSIGNED_INT, nullptr);
 
-        glDrawElements(GL_TRIANGLES, sphereIndices.size(), GL_UNSIGNED_INT, 0);
+        glBindTexture(GL_TEXTURE_2D, earthTexture);
+        glm::mat4 modelEarth = glm::translate(glm::mat4(1.0f), earthPos);
+        modelEarth = glm::scale(modelEarth, glm::vec3(0.5f));
+        glm::mat4 mvpEarth = proj * view * modelEarth;
+        glUniformMatrix4fv(mainMVP_Loc, 1, GL_FALSE, glm::value_ptr(mvpEarth));
+        glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(sphereIndices.size()),
+                       GL_UNSIGNED_INT, nullptr);
 
+        glBindBuffer(GL_ARRAY_BUFFER, trailVBO);
+        glBufferSubData(GL_ARRAY_BUFFER, 0,
+                        earthTrail.size() * sizeof(glm::vec3),
+                        earthTrail.data());
+
+        glUseProgram(trailShader);
+        glBindVertexArray(trailVAO);
+
+        glm::mat4 mvpTrail = proj * view * glm::mat4(1.0f);
+        glUniformMatrix4fv(trailMVP_Loc, 1, GL_FALSE, glm::value_ptr(mvpTrail));
+
+        int count = static_cast<int>(earthTrail.size());
+        for (int i = 0; i + 1 < count; i += 6) {
+            glDrawArrays(GL_LINES, i, 2);
+        }
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
 
-    glDeleteVertexArrays(1, &VAO);
-    glDeleteBuffers(1, &VBO);
-    glDeleteTextures(1, &texture);
-    glDeleteProgram(shaderProgram);
+    glDeleteVertexArrays(1, &sphereVAO);
+    glDeleteBuffers(1, &sphereVBO);
+    glDeleteBuffers(1, &sphereEBO);
+    glDeleteVertexArrays(1, &trailVAO);
+    glDeleteBuffers(1, &trailVBO);
+
+    glDeleteTextures(1, &sunTexture);
+    glDeleteTextures(1, &earthTexture);
+    glDeleteProgram(mainShader);
+    glDeleteProgram(trailShader);
 
     glfwDestroyWindow(window);
     glfwTerminate();
