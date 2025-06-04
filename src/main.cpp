@@ -140,17 +140,19 @@ int main() {
     glm::dvec2 v3_orig = {-0.103587960218793, -2.116685862168820};
 
     auto body1 = std::make_unique<CelestialBody>(
-        mass, glm::dvec3(r1_orig, 0.0) * posScale,
-        glm::dvec3(v1_orig, 0.0) * vScale, 0.5f, "textures/dirt.jpg",
-        glm::vec3(1.0f, 0.0f, 0.0f));
+        mass, glm::dvec3(r1_orig.x, 0.0, r1_orig.y) * posScale,
+        glm::dvec3(v1_orig.x, 0.0, v1_orig.y) * vScale, 0.5f,
+        "textures/dirt.jpg", glm::vec3(1.0f, 0.0f, 0.0f));
+
     auto body2 = std::make_unique<CelestialBody>(
-        mass, glm::dvec3(r2_orig, 0.0) * posScale,
-        glm::dvec3(v2_orig, 0.0) * vScale, 0.5f, "textures/lava.png",
-        glm::vec3(0.0f, 1.0f, 0.0f));
+        mass, glm::dvec3(r2_orig.x, 0.0, r2_orig.y) * posScale,
+        glm::dvec3(v2_orig.x, 0.0, v2_orig.y) * vScale, 0.5f,
+        "textures/lava.png", glm::vec3(0.0f, 1.0f, 0.0f));
+
     auto body3 = std::make_unique<CelestialBody>(
-        mass, glm::dvec3(r3_orig, 0.0) * posScale,
-        glm::dvec3(v3_orig, 0.0) * vScale, 0.5f, "textures/stone.jpg",
-        glm::vec3(0.0f, 0.4f, 1.0f));
+        mass, glm::dvec3(r3_orig.x, 0.0, r3_orig.y) * posScale,
+        glm::dvec3(v3_orig.x, 0.0, v3_orig.y) * vScale, 0.5f,
+        "textures/stone.jpg", glm::vec3(0.0f, 0.4f, 1.0f));
 
     physics.addBody(body1.get());
     physics.addBody(body2.get());
