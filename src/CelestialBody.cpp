@@ -10,8 +10,10 @@ static constexpr double G_CONST = 0.5;
 
 CelestialBody::CelestialBody(double mass, const glm::dvec3 &initialPos,
                              const glm::dvec3 &initialVel, float scale,
-                             const char *texturePath)
-    : mass(mass), position(initialPos), velocity(initialVel), scale(scale) {
+                             const char *texturePath,
+                             const glm::vec3 &trailColor)
+    : mass(mass), position(initialPos), velocity(initialVel), scale(scale),
+      trailColor(trailColor) {
     initMesh();
     textureID = loadTextureFromFile(texturePath);
 

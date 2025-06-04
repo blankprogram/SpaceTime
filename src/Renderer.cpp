@@ -117,6 +117,11 @@ void Renderer::drawAll(const std::vector<CelestialBody *> &bodies,
     for (auto *b : bodies) {
         glm::mat4 mvp = proj * view * glm::mat4(1.0f);
         glUniformMatrix4fv(trailMvpLoc, 1, GL_FALSE, glm::value_ptr(mvp));
+
+        const glm::vec3 &color = b->getTrailColor();
+        glUniform3fv(glGetUniformLocation(trailShader, "u_TrailColor"), 1,
+                     glm::value_ptr(color));
+
         b->drawTrail();
     }
 }

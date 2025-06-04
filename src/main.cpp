@@ -119,19 +119,21 @@ int main() {
     glfwSetWindowUserPointer(window, &renderer);
     glfwSetFramebufferSizeCallback(window, framebufferSizeCallback);
 
-    constexpr double mass = 100.0;
-    constexpr double posScale = 5.0;
+    constexpr double posScale = 20.0;
     constexpr double G_factor = 0.5;
-    const glm::dvec2 r1_orig = glm::dvec2(+0.97000436, -0.24308753);
-    const glm::dvec2 r2_orig = glm::dvec2(-0.97000436, +0.24308753);
-    const glm::dvec2 r3_orig = glm::dvec2(0.0, 0.0);
+    constexpr double mass = 100.0;
+    double GM_over_L = (G_factor * mass) / posScale;
+    double vScale = std::sqrt(GM_over_L);
 
-    const glm::dvec2 v1_orig = glm::dvec2(+0.4662036850, +0.4323657300);
-    const glm::dvec2 v2_orig = glm::dvec2(+0.4662036850, +0.4323657300);
-    const glm::dvec2 v3_orig = glm::dvec2(-0.93240737, -0.86473146);
+    // "Flower in Circle" initial positions
+    glm::dvec2 r1_orig = {-0.602885898116520, 0.059162128863347};
+    glm::dvec2 r2_orig = {0.252709795391000, 0.058254872224370};
+    glm::dvec2 r3_orig = {-0.355389016941814, 0.038323764315145};
 
-    double GM_over_L = (G_factor * mass) / posScale; // = (0.5*100)/5 = 10
-    double vScale = std::sqrt(GM_over_L);            // ≈ 3.16227766
+    // Initial velocities
+    glm::dvec2 v1_orig = {0.122913546623784, 0.747443868604908};
+    glm::dvec2 v2_orig = {-0.019325586404545, 1.369241993562101};
+    glm::dvec2 v3_orig = {-0.103587960218793, -2.116685862168820};
 
     glm::dvec3 pos1 = glm::dvec3(r1_orig.x, r1_orig.y, 0.0) * posScale;
     glm::dvec3 pos2 = glm::dvec3(r2_orig.x, r2_orig.y, 0.0) * posScale;
@@ -142,11 +144,16 @@ int main() {
     glm::dvec3 vel3 = glm::dvec3(v3_orig.x, v3_orig.y, 0.0) * vScale;
 
     CelestialBody *body1 =
-        new CelestialBody(mass, pos1, vel1, 0.5f, "textures/dirt.jpg");
+        new CelestialBody(mass, pos1, vel1, 0.5f, "textures/dirt.jpg",
+                          glm::vec3(1.0f, 0.0f, 0.0f)); // red
+
     CelestialBody *body2 =
-        new CelestialBody(mass, pos2, vel2, 0.5f, "textures/lava.png");
+        new CelestialBody(mass, pos2, vel2, 0.5f, "textures/lava.png",
+                          glm::vec3(0.0f, 1.0f, 0.0f)); // green
+
     CelestialBody *body3 =
-        new CelestialBody(mass, pos3, vel3, 0.5f, "textures/stone.jpg");
+        new CelestialBody(mass, pos3, vel3, 0.5f, "textures/stone.jpg",
+                          glm::vec3(0.0f, 0.4f, 1.0f)); // blue
 
     physics.addBody(body1);
     physics.addBody(body2);
