@@ -14,12 +14,12 @@ class CelestialBody {
     CelestialBody(double mass, const glm::dvec3 &initialPos,
                   const glm::dvec3 &initialVel, float scale,
                   const char *texturePath, const glm::vec3 &trailColor);
-
     ~CelestialBody();
-    void updateTrail(float dt);
 
+    void updateTrail(float dt);
     glm::dvec3
     computeAcceleration(const std::vector<CelestialBody *> &others) const;
+
     const glm::dvec3 &getPosition() const { return position; }
     const glm::dvec3 &getVelocity() const { return velocity; }
     const glm::vec3 &getTrailColor() const { return trailColor; }
@@ -30,9 +30,7 @@ class CelestialBody {
     void setVelocity(const glm::dvec3 &v) { velocity = v; }
 
     void bindMeshAndTexture() const;
-
     void drawMesh() const;
-
     void drawTrail() const;
 
   private:
@@ -55,6 +53,7 @@ class CelestialBody {
     static constexpr size_t MAX_TRAIL_POINTS = 1000;
 
     void initMesh();
+    void initTrailBuffer();
     GLuint loadTextureFromFile(const char *path);
     void sampleTrailPoint();
     void rebuildTrailBuffer();
