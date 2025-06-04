@@ -48,8 +48,8 @@ class CelestialBody {
     GLuint trailVAO = 0, trailVBO = 0;
     float sampleAccumulator = 0.0f;
 
-    static constexpr float POINT_LIFETIME = 1000.0f;
-    static constexpr float SAMPLE_INTERVAL = 0.025f;
+    static constexpr float POINT_LIFETIME = 30.0f;
+    static constexpr float SAMPLE_INTERVAL = 0.05f;
     static constexpr size_t MAX_TRAIL_POINTS = 1000;
 
     void initMesh();

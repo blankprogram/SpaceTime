@@ -12,7 +12,7 @@ constexpr int WINDOW_WIDTH = 800;
 constexpr int WINDOW_HEIGHT = 600;
 constexpr float MOUSE_SENSITIVITY = 0.1f;
 constexpr float CAMERA_SPEED = 5.0f;
-constexpr float CAMERA_SPRINT_MULT = 3.0f;
+constexpr float CAMERA_SPRINT_MULT = 5.0f;
 constexpr float MAX_PITCH = 89.0f;
 
 struct Camera {
@@ -159,7 +159,7 @@ int main() {
     physics.addBody(body3.get());
 
     lastFrame = glfwGetTime();
-    const double maxSubstep = 0.001;
+    const double maxSubstep = 0.01;
 
     while (!glfwWindowShouldClose(window)) {
         double now = glfwGetTime();
