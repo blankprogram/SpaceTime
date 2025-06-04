@@ -1,22 +1,23 @@
 #pragma once
-
 #include "CelestialBody.h"
+#include <glm/gtc/type_ptr.hpp>
 #include <vector>
 
 class PhysicsEngine {
-public:
-  PhysicsEngine();
-  ~PhysicsEngine();
+  public:
+    PhysicsEngine();
+    ~PhysicsEngine();
 
-  void addBody(CelestialBody *body);
+    void addBody(CelestialBody *body);
 
-  void step(float dt);
+    void step(double dt);
 
-  const std::vector<CelestialBody *> &getBodies() const;
+    const std::vector<CelestialBody *> &getBodies() const;
 
-private:
-  std::vector<CelestialBody *> bodies;
-  std::vector<glm::vec3> accelerations;
+  private:
+    std::vector<CelestialBody *> bodies;
 
-  void computeAccelerations();
+    std::vector<glm::dvec3> accelerations;
+
+    void computeAccelerations();
 };
