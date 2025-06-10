@@ -1,39 +1,31 @@
 #pragma once
-#include "CelestialBody.h"
+
 #include "GravityWell.h"
+#include "ShaderProgram.h"
+#include <filesystem>
 #include <glad/glad.h>
 #include <glm/glm.hpp>
 #include <string>
 #include <vector>
+
 class Renderer {
   public:
     Renderer(int width, int height);
-    ~Renderer();
+    ~Renderer() noexcept;
 
-    void drawAll(const std::vector<CelestialBody *> &bodies,
-                 const glm::mat4 &view, const glm::mat4 &proj);
+    void drawAll(const std::vector<class CelestialBody *> &bodies,
+                 const glm::mat4 &view, const glm::mat4 &proj) noexcept;
 
-    void setViewportSize(int width, int height);
+    void setViewportSize(int width, int height) noexcept;
 
   private:
-    int width, height;
+    int width_, height_;
 
-    GLuint bodyShader;
-    GLuint trailShader;
+    ShaderProgram bodyProg_;
+    ShaderProgram trailProg_;
+    ShaderProgram wellProg_;
 
-    GLint bodyMvpLoc;
-    GLint bodyTexLoc;
-    GLint trailMvpLoc;
+    GravityWell gravityWell_;
 
-    GLuint wellShader;
-    GLint wellMvpLoc;
-
-    GravityWell gravityWell = GravityWell(40.0f, 100);
-
-    std::string loadFileToString(const char *path);
-    GLuint compileSingleShader(GLenum type, const std::string &src);
-    GLuint linkProgram(GLuint vs, GLuint fs);
-
-    void initShaders();
-    void cleanupShaders();
+    static std::string loadFile(const std::filesystem::path &path);
 };
