@@ -1,6 +1,6 @@
 #pragma once
 
-#include <glad/glad.h>
+#include "raii.h" // VertexArray, Buffer, Texture2D, RingBuffer
 #include <glm/glm.hpp>
 #include <vector>
 
@@ -14,47 +14,45 @@ class CelestialBody {
     CelestialBody(double mass, const glm::dvec3 &initialPos,
                   const glm::dvec3 &initialVel, float scale,
                   const char *texturePath, const glm::vec3 &trailColor);
-    ~CelestialBody();
+    ~CelestialBody() noexcept;
 
     void updateTrail(float dt);
     glm::dvec3
     computeAcceleration(const std::vector<CelestialBody *> &others) const;
 
-    const glm::dvec3 &getPosition() const { return position; }
-    const glm::dvec3 &getVelocity() const { return velocity; }
-    const glm::vec3 &getTrailColor() const { return trailColor; }
-    float getMass() const { return mass; }
-    float getScale() const { return scale; }
+    const glm::dvec3 &getPosition() const noexcept { return pos_; }
+    const glm::vec3 &getTrailColor() const noexcept { return trailColor_; }
+    float getScale() const noexcept { return scale_; }
 
-    void setPosition(const glm::dvec3 &p) { position = p; }
-    void setVelocity(const glm::dvec3 &v) { velocity = v; }
+    void bindMeshAndTexture() const noexcept;
+    void drawMesh() const noexcept;
+    void drawTrail() const noexcept;
 
-    void bindMeshAndTexture() const;
-    void drawMesh() const;
-    void drawTrail() const;
+    double getMass() const noexcept { return mass_; }
+    glm::dvec3 getVelocity() const noexcept { return vel_; }
+    void setPosition(const glm::dvec3 &p) noexcept { pos_ = p; }
+    void setVelocity(const glm::dvec3 &v) noexcept { vel_ = v; }
 
   private:
-    double mass;
-    glm::dvec3 position;
-    glm::dvec3 velocity;
-    double scale;
+    double mass_;
+    glm::dvec3 pos_, vel_;
+    float scale_;
 
-    GLuint sphereVAO = 0, sphereVBO = 0, sphereEBO = 0;
-    GLuint textureID = 0;
-    GLsizei indexCount = 0;
+    VertexArray sphereVAO_;
+    Buffer sphereVBO_, sphereEBO_;
+    Texture2D texture_;
+    GLsizei indexCount_;
 
-    std::vector<TrailPoint> trail;
-    glm::vec3 trailColor;
-    GLuint trailVAO = 0, trailVBO = 0;
-    float sampleAccumulator = 0.0f;
+    VertexArray trailVAO_;
+    Buffer trailVBO_;
 
-    static constexpr float POINT_LIFETIME = 30.0f;
-    static constexpr float SAMPLE_INTERVAL = 0.05f;
-    static constexpr size_t MAX_TRAIL_POINTS = 1000;
+    static constexpr size_t MAX_TRAILS = 1000;
+    RingBuffer<TrailPoint, MAX_TRAILS> trail_;
+    float sampleAcc_ = 0.0f;
+    glm::vec3 trailColor_;
 
     void initMesh();
-    void initTrailBuffer();
-    GLuint loadTextureFromFile(const char *path);
-    void sampleTrailPoint();
+    void initTrail();
     void rebuildTrailBuffer();
+    unsigned loadTexture(const char *path) noexcept;
 };

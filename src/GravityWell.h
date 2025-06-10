@@ -1,20 +1,29 @@
 #pragma once
-#include <glad/glad.h>
+
+#include "raii.h"
 #include <glm/glm.hpp>
 #include <vector>
+
+class CelestialBody;
 
 class GravityWell {
   public:
     GravityWell(float size, int resolution);
-    ~GravityWell();
+    ~GravityWell() noexcept;
 
-    void updateFromBodies(const std::vector<class CelestialBody *> &bodies,
-                          float G);
-    void draw() const;
+    void updateFromBodies(const std::vector<CelestialBody *> &bodies,
+                          float G) noexcept;
+    void draw() const noexcept;
 
   private:
-    GLuint vao = 0, vbo = 0;
-    GLsizei vertexCount = 0;
-    float size;
-    int resolution;
+    VertexArray vao_;
+    Buffer vbo_;
+    size_t vertexCount_;
+
+    float size_;
+    int resolution_;
+
+    std::vector<float> cpuBuffer_;
+
+    void setupBuffers() noexcept;
 };

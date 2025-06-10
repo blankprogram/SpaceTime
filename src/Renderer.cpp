@@ -1,6 +1,6 @@
-// Renderer.cpp
 #include "Renderer.h"
 #include "CelestialBody.h"
+
 #include <format>
 #include <fstream>
 #include <glm/gtc/matrix_transform.hpp>
@@ -20,13 +20,14 @@ std::string Renderer::loadFile(const std::filesystem::path &path) {
 }
 
 Renderer::Renderer(int w, int h)
-    : width_{w}, height_{h}, bodyProg_{loadFile("shaders/vertex.glsl"),
-                                       loadFile("shaders/fragment.glsl")},
-      trailProg_{loadFile("shaders/trail.vert"),
-                 loadFile("shaders/trail.frag")},
-      wellProg_{loadFile("shaders/gravitywell.vert"),
-                loadFile("shaders/gravitywell.frag")},
-      gravityWell_{40.0f, 100} {
+    : width_{w}, height_{h},
+      bodyProg_{Program::fromSources(loadFile("shaders/vertex.glsl"),
+                                     loadFile("shaders/fragment.glsl"))},
+      trailProg_{Program::fromSources(loadFile("shaders/trail.vert"),
+                                      loadFile("shaders/trail.frag"))},
+      wellProg_{Program::fromSources(loadFile("shaders/gravitywell.vert"),
+                                     loadFile("shaders/gravitywell.frag"))},
+      gravityWell_{40.0f, 25} {
     glViewport(0, 0, width_, height_);
 }
 
@@ -43,38 +44,37 @@ void Renderer::drawAll(const std::vector<CelestialBody *> &bodies,
     glClearColor(0, 0, 0, 1);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    // -- gravity well --
     gravityWell_.updateFromBodies(bodies, 0.5f);
     wellProg_.use();
-    glm::mat4 mvp = proj * view;
-    glUniformMatrix4fv(wellProg_.uniformLocation("u_MVP"), 1, GL_FALSE,
-                       reinterpret_cast<const GLfloat *>(&mvp));
+    {
+        glm::mat4 mvp = proj * view;
+        glUniformMatrix4fv(wellProg_.uniform("u_MVP"), 1, GL_FALSE,
+                           glm::value_ptr(mvp));
+    }
     gravityWell_.draw();
 
     bodyProg_.use();
     for (auto *b : bodies) {
-        glm::vec3 posF = glm::vec3(b->getPosition());
-        glm::mat4 model = glm::translate(glm::mat4{1.0f}, posF) *
-                          glm::scale(glm::mat4{1.0f}, glm::vec3(b->getScale()));
+        glm::mat4 model =
+            glm::translate(glm::mat4{1.0f}, glm::vec3(b->getPosition())) *
+            glm::scale(glm::mat4{1.0f}, glm::vec3(b->getScale()));
 
-        glm::mat4 bodyMvp = proj * view * model;
-        glUniformMatrix4fv(bodyProg_.uniformLocation("u_MVP"), 1, GL_FALSE,
-                           reinterpret_cast<const GLfloat *>(&bodyMvp));
-        glUniform1i(bodyProg_.uniformLocation("u_Texture"), 0);
+        glm::mat4 mvp = proj * view * model;
+        glUniformMatrix4fv(bodyProg_.uniform("u_MVP"), 1, GL_FALSE,
+                           glm::value_ptr(mvp));
+        glUniform1i(bodyProg_.uniform("u_Texture"), 0);
 
         b->bindMeshAndTexture();
         b->drawMesh();
     }
 
     trailProg_.use();
-    GLint trailMvpLoc = trailProg_.uniformLocation("u_MVP");
-    GLint colorLoc = trailProg_.uniformLocation("u_TrailColor");
+    GLint locMvp = trailProg_.uniform("u_MVP");
+    GLint locColor = trailProg_.uniform("u_TrailColor");
     for (auto *b : bodies) {
-        glm::mat4 tMvp = proj * view;
-        glUniformMatrix4fv(trailMvpLoc, 1, GL_FALSE,
-                           reinterpret_cast<const GLfloat *>(&tMvp));
-        glUniform3fv(colorLoc, 1,
-                     reinterpret_cast<const GLfloat *>(&b->getTrailColor()));
+        glm::mat4 mvp = proj * view;
+        glUniformMatrix4fv(locMvp, 1, GL_FALSE, glm::value_ptr(mvp));
+        glUniform3fv(locColor, 1, glm::value_ptr(b->getTrailColor()));
         b->drawTrail();
     }
 }
