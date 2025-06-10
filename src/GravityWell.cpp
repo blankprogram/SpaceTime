@@ -37,17 +37,24 @@ void GravityWell::updateFromBodies(const std::vector<CelestialBody *> &bodies,
         for (int i = 0; i < N; ++i) {
             float x = (i - resolution_) * step;
             float z = (j - resolution_) * step;
-            float y = 0.0f;
+            float rawY = 0.0f;
             for (auto *b : bodies) {
                 auto p = b->getPosition();
                 float dx = x - float(p.x);
                 float dz = z - float(p.z);
                 float d = std::sqrt(dx * dx + dz * dz + 0.1f);
-                y += -G * float(b->getMass()) / d;
+                rawY += -G * float(b->getMass()) / d;
             }
-            yGrid[j * N + i] = y;
+            yGrid[j * N + i] = rawY;
         }
     }
+
+    constexpr float K = 0.2f;
+    constexpr float SCALE = 15.0f;
+    auto warp = [&](float v) {
+        float t = (2.0f / 3.14159265f) * std::atan(v * K);
+        return t * SCALE;
+    };
 
     float *ptr = cpuBuffer_.data();
     for (int j = 0; j < N; ++j) {
@@ -55,8 +62,8 @@ void GravityWell::updateFromBodies(const std::vector<CelestialBody *> &bodies,
             float x0 = (i - resolution_) * step;
             float x1 = (i + 1 - resolution_) * step;
             float z0 = (j - resolution_) * step;
-            float y0 = yGrid[j * N + i];
-            float y1 = yGrid[j * N + (i + 1)];
+            float y0 = warp(yGrid[j * N + i]);
+            float y1 = warp(yGrid[j * N + (i + 1)]);
 
             *ptr++ = x0;
             *ptr++ = y0;
@@ -71,8 +78,8 @@ void GravityWell::updateFromBodies(const std::vector<CelestialBody *> &bodies,
             float x0 = (i - resolution_) * step;
             float z0 = (j - resolution_) * step;
             float z1 = (j + 1 - resolution_) * step;
-            float y0 = yGrid[j * N + i];
-            float y1 = yGrid[(j + 1) * N + i];
+            float y0 = warp(yGrid[j * N + i]);
+            float y1 = warp(yGrid[(j + 1) * N + i]);
 
             *ptr++ = x0;
             *ptr++ = y0;
@@ -85,7 +92,7 @@ void GravityWell::updateFromBodies(const std::vector<CelestialBody *> &bodies,
 
     glBindBuffer(GL_ARRAY_BUFFER, vbo_.id);
     glBufferSubData(GL_ARRAY_BUFFER, 0,
-                    static_cast<GLsizeiptr>(cpuBuffer_.size() * sizeof(float)),
+                    GLsizei(cpuBuffer_.size() * sizeof(float)),
                     cpuBuffer_.data());
 }
 
