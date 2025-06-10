@@ -123,6 +123,10 @@ int main() {
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glEnable(GL_PROGRAM_POINT_SIZE);
 
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
+    glFrontFace(GL_CCW);
+
     PhysicsEngine physics;
     Renderer renderer(WINDOW_WIDTH, WINDOW_HEIGHT);
 
@@ -199,8 +203,16 @@ int main() {
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
+        ImGui::SetNextWindowSize(ImVec2(200, 200), ImGuiCond_Always);
+
         ImGui::Begin("Performance");
+
         ImGui::Text("FPS: %.1f", 1.0f / deltaTime);
+
+        ImGui::Text("GPU Primitives: %d", renderer.getTotalPrimitives());
+        ImGui::Text("Mesh (Triangles): %d", renderer.getMeshPrimitives());
+        ImGui::Text("Trails (Lines): %d", renderer.getTrailPrimitives());
+        ImGui::Text("Well Lines: %d", renderer.getWellPrimitives());
         ImGui::End();
 
         ImGui::Render();
