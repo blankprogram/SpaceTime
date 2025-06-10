@@ -3,8 +3,11 @@
 #include "Renderer.h"
 
 #include <GLFW/glfw3.h>
+#include <backends/imgui_impl_glfw.h>
+#include <backends/imgui_impl_opengl3.h>
 #include <glad/glad.h>
 #include <glm/gtc/matrix_transform.hpp>
+#include <imgui.h>
 #include <iostream>
 #include <memory>
 
@@ -161,6 +164,13 @@ int main() {
     lastFrame = glfwGetTime();
     const double maxSubstep = 0.01;
 
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO &io = ImGui::GetIO();
+    (void)io;
+    ImGui::StyleColorsDark();
+    ImGui_ImplGlfw_InitForOpenGL(window, true);
+    ImGui_ImplOpenGL3_Init("#version 450");
     while (!glfwWindowShouldClose(window)) {
         double now = glfwGetTime();
         double rawDt = now - lastFrame;
@@ -185,11 +195,25 @@ int main() {
 
         renderer.drawAll(physics.getBodies(), view, proj);
 
+        ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplGlfw_NewFrame();
+        ImGui::NewFrame();
+
+        ImGui::Begin("Performance");
+        ImGui::Text("FPS: %.1f", 1.0f / deltaTime);
+        ImGui::End();
+
+        ImGui::Render();
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
 
     glfwDestroyWindow(window);
+
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplGlfw_Shutdown();
+    ImGui::DestroyContext();
     glfwTerminate();
     return 0;
 }

@@ -78,6 +78,16 @@ void Renderer::initShaders() {
     glDeleteShader(fs);
 
     trailMvpLoc = glGetUniformLocation(trailShader, "u_MVP");
+
+    std::string wellVS = loadFileToString("shaders/gravitywell.vert");
+    std::string wellFS = loadFileToString("shaders/gravitywell.frag");
+    GLuint wvs = compileSingleShader(GL_VERTEX_SHADER, wellVS);
+    GLuint wfs = compileSingleShader(GL_FRAGMENT_SHADER, wellFS);
+    wellShader = linkProgram(wvs, wfs);
+    glDeleteShader(wvs);
+    glDeleteShader(wfs);
+
+    wellMvpLoc = glGetUniformLocation(wellShader, "u_MVP");
 }
 
 void Renderer::cleanupShaders() {
@@ -95,6 +105,12 @@ void Renderer::drawAll(const std::vector<CelestialBody *> &bodies,
                        const glm::mat4 &view, const glm::mat4 &proj) {
     glClearColor(0, 0, 0, 1);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    gravityWell.updateFromBodies(bodies, 0.5f);
+    glUseProgram(wellShader);
+    glm::mat4 mvp = proj * view * glm::mat4(1.0f);
+    glUniformMatrix4fv(wellMvpLoc, 1, GL_FALSE, glm::value_ptr(mvp));
+    gravityWell.draw();
 
     glUseProgram(bodyShader);
     for (auto *b : bodies) {

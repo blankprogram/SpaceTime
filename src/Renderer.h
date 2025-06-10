@@ -1,5 +1,6 @@
 #pragma once
 #include "CelestialBody.h"
+#include "GravityWell.h"
 #include <glad/glad.h>
 #include <glm/glm.hpp>
 #include <string>
@@ -23,6 +24,11 @@ class Renderer {
     GLint bodyMvpLoc;
     GLint bodyTexLoc;
     GLint trailMvpLoc;
+
+    GLuint wellShader;
+    GLint wellMvpLoc;
+
+    GravityWell gravityWell = GravityWell(40.0f, 100);
 
     std::string loadFileToString(const char *path);
     GLuint compileSingleShader(GLenum type, const std::string &src);
