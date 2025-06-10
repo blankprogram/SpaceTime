@@ -8,6 +8,7 @@
 #include <iostream>
 #include <numbers>
 #include <span>
+#include <vector>
 static constexpr float POINT_LIFE = 30.0f;
 static constexpr float SAMPLE_INTV = 0.05f;
 static constexpr double G_CONST = 0.5;
@@ -24,20 +25,6 @@ CelestialBody::CelestialBody(double mass, const glm::dvec3 &initialPos,
 }
 
 CelestialBody::~CelestialBody() noexcept = default;
-
-glm::dvec3 CelestialBody::computeAcceleration(
-    const std::vector<CelestialBody *> &others) const {
-    glm::dvec3 a{0.0};
-    for (auto *o : others) {
-        if (o == this)
-            continue;
-        glm::dvec3 diff = o->pos_ - pos_;
-        double dist2 = glm::dot(diff, diff) + 1e-15;
-        double invDist3 = 1.0 / (dist2 * std::sqrt(dist2));
-        a += (G_CONST * o->mass_) * (diff * invDist3);
-    }
-    return a;
-}
 
 void CelestialBody::updateTrail(float dt) {
     sampleAcc_ += dt;

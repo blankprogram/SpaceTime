@@ -27,7 +27,7 @@ Renderer::Renderer(int w, int h)
                                       loadFile("shaders/trail.frag"))},
       wellProg_{Program::fromSources(loadFile("shaders/gravitywell.vert"),
                                      loadFile("shaders/gravitywell.frag"))},
-      gravityWell_{40.0f, 25} {
+      gravityWell_{40.0f, 50} {
     glViewport(0, 0, width_, height_);
 }
 

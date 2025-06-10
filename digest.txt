@@ -42,7 +42,7 @@ File: CMakeLists.txt
 cmake_minimum_required(VERSION 3.16)
 project(SpaceTimeCube)
 
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
@@ -147,8 +147,6 @@ add_custom_command(TARGET SpaceTimeCube POST_BUILD
 ================================================
 File: src/CelestialBody.cpp
 ================================================
-// src/CelestialBody.cpp
-
 #include "CelestialBody.h"
 
 #define STB_IMAGE_IMPLEMENTATION
@@ -158,7 +156,7 @@ File: src/CelestialBody.cpp
 #include <glm/gtc/type_ptr.hpp>
 #include <iostream>
 #include <numbers>
-
+#include <span>
 static constexpr float POINT_LIFE = 30.0f;
 static constexpr float SAMPLE_INTV = 0.05f;
 static constexpr double G_CONST = 0.5;
@@ -283,10 +281,11 @@ void CelestialBody::rebuildTrailBuffer() {
         data.push_back(tp.position.z);
         data.push_back(lf);
     });
+
+    std::span<const float> span{data};
+
     glBindBuffer(GL_ARRAY_BUFFER, trailVBO_.id);
-    glBufferSubData(GL_ARRAY_BUFFER, 0,
-                    static_cast<GLsizeiptr>(data.size() * sizeof(float)),
-                    data.data());
+    glBufferSubData(GL_ARRAY_BUFFER, 0, span.size_bytes(), span.data());
 }
 
 unsigned CelestialBody::loadTexture(const char *path) noexcept {

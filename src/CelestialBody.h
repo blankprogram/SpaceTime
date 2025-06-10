@@ -1,8 +1,7 @@
 #pragma once
 
-#include "raii.h" // VertexArray, Buffer, Texture2D, RingBuffer
+#include "raii.h"
 #include <glm/glm.hpp>
-#include <vector>
 
 struct TrailPoint {
     glm::vec3 position;
@@ -17,8 +16,6 @@ class CelestialBody {
     ~CelestialBody() noexcept;
 
     void updateTrail(float dt);
-    glm::dvec3
-    computeAcceleration(const std::vector<CelestialBody *> &others) const;
 
     const glm::dvec3 &getPosition() const noexcept { return pos_; }
     const glm::vec3 &getTrailColor() const noexcept { return trailColor_; }

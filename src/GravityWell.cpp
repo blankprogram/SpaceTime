@@ -43,7 +43,7 @@ void GravityWell::updateFromBodies(const std::vector<CelestialBody *> &bodies,
                 float dx = x - float(p.x);
                 float dz = z - float(p.z);
                 float d = std::sqrt(dx * dx + dz * dz + 0.1f);
-                y += -G * float(b->getScale()) / d;
+                y += -G * float(b->getMass()) / d;
             }
             yGrid[j * N + i] = y;
         }
