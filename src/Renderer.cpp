@@ -69,6 +69,8 @@ void Renderer::drawAll(const std::vector<CelestialBody *> &bodies,
     }
 
     trailProg_.use();
+    glDepthMask(GL_FALSE);
+    glEnable(GL_DEPTH_TEST);
     GLint locMvp = trailProg_.uniform("u_MVP");
     GLint locColor = trailProg_.uniform("u_TrailColor");
     for (auto *b : bodies) {
@@ -77,4 +79,6 @@ void Renderer::drawAll(const std::vector<CelestialBody *> &bodies,
         glUniform3fv(locColor, 1, glm::value_ptr(b->getTrailColor()));
         b->drawTrail();
     }
+
+    glDepthMask(GL_TRUE);
 }

@@ -126,18 +126,28 @@ target_link_libraries(SpaceTimeCube PRIVATE
 
 target_compile_definitions(SpaceTimeCube PRIVATE GLFW_INCLUDE_NONE)
 
-# ───── Assets ─────
-add_custom_command(TARGET SpaceTimeCube POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-            ${SRC_DIR}/shaders
-            $<TARGET_FILE_DIR:SpaceTimeCube>/shaders
+
+
+file(GLOB_RECURSE SHADERS
+     "${SRC_DIR}/shaders/*.vert"
+     "${SRC_DIR}/shaders/*.frag"
+     "${SRC_DIR}/shaders/*.comp"
+)
+file(GLOB_RECURSE TEXTURES
+     "${SRC_DIR}/textures/*"
 )
 
-add_custom_command(TARGET SpaceTimeCube POST_BUILD
+add_custom_target(copy-assets ALL
+    DEPENDS ${SHADERS} ${TEXTURES}
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+            ${SRC_DIR}/shaders
+            ${CMAKE_CURRENT_BINARY_DIR}/shaders
     COMMAND ${CMAKE_COMMAND} -E copy_directory
             ${SRC_DIR}/textures
-            $<TARGET_FILE_DIR:SpaceTimeCube>/textures
+            ${CMAKE_CURRENT_BINARY_DIR}/textures
 )
+
+add_dependencies(SpaceTimeCube copy-assets)
 
 
 
@@ -148,6 +158,7 @@ add_custom_command(TARGET SpaceTimeCube POST_BUILD
 File: src/CelestialBody.cpp
 ================================================
 #include "CelestialBody.h"
+#include "raii.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
@@ -157,6 +168,7 @@ File: src/CelestialBody.cpp
 #include <iostream>
 #include <numbers>
 #include <span>
+#include <vector>
 static constexpr float POINT_LIFE = 30.0f;
 static constexpr float SAMPLE_INTV = 0.05f;
 static constexpr double G_CONST = 0.5;
@@ -173,20 +185,6 @@ CelestialBody::CelestialBody(double mass, const glm::dvec3 &initialPos,
 }
 
 CelestialBody::~CelestialBody() noexcept = default;
-
-glm::dvec3 CelestialBody::computeAcceleration(
-    const std::vector<CelestialBody *> &others) const {
-    glm::dvec3 a{0.0};
-    for (auto *o : others) {
-        if (o == this)
-            continue;
-        glm::dvec3 diff = o->pos_ - pos_;
-        double dist2 = glm::dot(diff, diff) + 1e-15;
-        double invDist3 = 1.0 / (dist2 * std::sqrt(dist2));
-        a += (G_CONST * o->mass_) * (diff * invDist3);
-    }
-    return a;
-}
 
 void CelestialBody::updateTrail(float dt) {
     sampleAcc_ += dt;
@@ -319,8 +317,13 @@ void CelestialBody::drawMesh() const noexcept {
 }
 
 void CelestialBody::drawTrail() const noexcept {
+    size_t n = trail_.size();
+    if (n < 2)
+        return;
+
     glBindVertexArray(trailVAO_.id);
-    glDrawArrays(GL_POINTS, 0, static_cast<GLsizei>(trail_.size()));
+
+    glDrawArrays(GL_LINE_STRIP, 0, static_cast<GLsizei>(n));
 }
 
 
@@ -330,9 +333,8 @@ File: src/CelestialBody.h
 ================================================
 #pragma once
 
-#include "raii.h" // VertexArray, Buffer, Texture2D, RingBuffer
+#include "raii.h"
 #include <glm/glm.hpp>
-#include <vector>
 
 struct TrailPoint {
     glm::vec3 position;
@@ -347,8 +349,6 @@ class CelestialBody {
     ~CelestialBody() noexcept;
 
     void updateTrail(float dt);
-    glm::dvec3
-    computeAcceleration(const std::vector<CelestialBody *> &others) const;
 
     const glm::dvec3 &getPosition() const noexcept { return pos_; }
     const glm::vec3 &getTrailColor() const noexcept { return trailColor_; }
@@ -437,7 +437,7 @@ void GravityWell::updateFromBodies(const std::vector<CelestialBody *> &bodies,
                 float dx = x - float(p.x);
                 float dz = z - float(p.z);
                 float d = std::sqrt(dx * dx + dz * dz + 0.1f);
-                y += -G * float(b->getScale()) / d;
+                y += -G * float(b->getMass()) / d;
             }
             yGrid[j * N + i] = y;
         }
@@ -701,7 +701,7 @@ Renderer::Renderer(int w, int h)
                                       loadFile("shaders/trail.frag"))},
       wellProg_{Program::fromSources(loadFile("shaders/gravitywell.vert"),
                                      loadFile("shaders/gravitywell.frag"))},
-      gravityWell_{40.0f, 25} {
+      gravityWell_{40.0f, 50} {
     glViewport(0, 0, width_, height_);
 }
 
@@ -1220,7 +1220,7 @@ File: src/shaders/gravitywell.frag
 #version 450
 out vec4 FragColor;
 void main() {
-    FragColor = vec4(1.0); }
+    FragColor = vec4(1.0,1.0,1.0,0.5); }
 
 
 

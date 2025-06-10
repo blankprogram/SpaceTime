@@ -86,16 +86,26 @@ target_link_libraries(SpaceTimeCube PRIVATE
 
 target_compile_definitions(SpaceTimeCube PRIVATE GLFW_INCLUDE_NONE)
 
-# ───── Assets ─────
-add_custom_command(TARGET SpaceTimeCube POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-            ${SRC_DIR}/shaders
-            $<TARGET_FILE_DIR:SpaceTimeCube>/shaders
+
+
+file(GLOB_RECURSE SHADERS
+     "${SRC_DIR}/shaders/*.vert"
+     "${SRC_DIR}/shaders/*.frag"
+     "${SRC_DIR}/shaders/*.comp"
+)
+file(GLOB_RECURSE TEXTURES
+     "${SRC_DIR}/textures/*"
 )
 
-add_custom_command(TARGET SpaceTimeCube POST_BUILD
+add_custom_target(copy-assets ALL
+    DEPENDS ${SHADERS} ${TEXTURES}
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+            ${SRC_DIR}/shaders
+            ${CMAKE_CURRENT_BINARY_DIR}/shaders
     COMMAND ${CMAKE_COMMAND} -E copy_directory
             ${SRC_DIR}/textures
-            $<TARGET_FILE_DIR:SpaceTimeCube>/textures
+            ${CMAKE_CURRENT_BINARY_DIR}/textures
 )
+
+add_dependencies(SpaceTimeCube copy-assets)
 

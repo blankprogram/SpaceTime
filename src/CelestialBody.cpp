@@ -1,4 +1,5 @@
 #include "CelestialBody.h"
+#include "raii.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
@@ -157,6 +158,11 @@ void CelestialBody::drawMesh() const noexcept {
 }
 
 void CelestialBody::drawTrail() const noexcept {
+    size_t n = trail_.size();
+    if (n < 2)
+        return;
+
     glBindVertexArray(trailVAO_.id);
-    glDrawArrays(GL_POINTS, 0, static_cast<GLsizei>(trail_.size()));
+
+    glDrawArrays(GL_LINE_STRIP, 0, static_cast<GLsizei>(n));
 }
