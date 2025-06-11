@@ -1,76 +1,60 @@
 cmake_minimum_required(VERSION 3.16)
-project(SpaceTime)
+project(spacetime LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-find_package(OpenGL REQUIRED)
+if(NOT DEFINED CMAKE_TOOLCHAIN_FILE)
+    set(CMAKE_TOOLCHAIN_FILE "${CMAKE_SOURCE_DIR}/vcpkg/scripts/buildsystems/vcpkg.cmake" CACHE STRING "")
+endif()
+
 find_package(glfw3 REQUIRED)
 find_package(glm REQUIRED)
+find_package(OpenGL REQUIRED)
+find_package(glad REQUIRED)
+find_package(imgui REQUIRED)
 
 set(SRC_DIR ${CMAKE_SOURCE_DIR}/src)
-set(EXTERNAL_DIR ${CMAKE_SOURCE_DIR}/external)
-set(IMGUI_DIR ${EXTERNAL_DIR}/imgui)
+set(IMGUI_BACKENDS_DIR ${CMAKE_SOURCE_DIR}/external/imgui_backends)
 
-set(SRC_FILES
-    ${SRC_DIR}/main.cpp
-    ${SRC_DIR}/CelestialBody.cpp
-    ${SRC_DIR}/PhysicsEngine.cpp
-    ${SRC_DIR}/Renderer.cpp
-    ${SRC_DIR}/GravityWell.cpp
-    ${EXTERNAL_DIR}/glad/glad.c
+file(GLOB SRC_FILES
+    ${SRC_DIR}/*.cpp
+    ${IMGUI_BACKENDS_DIR}/imgui_impl_glfw.cpp
+    ${IMGUI_BACKENDS_DIR}/imgui_impl_opengl3.cpp
 )
 
-# ───── ImGui Sources ─────
-set(IMGUI_SOURCES
-    ${IMGUI_DIR}/imgui.cpp
-    ${IMGUI_DIR}/imgui_demo.cpp
-    ${IMGUI_DIR}/imgui_draw.cpp
-    ${IMGUI_DIR}/imgui_tables.cpp
-    ${IMGUI_DIR}/imgui_widgets.cpp
-    ${IMGUI_DIR}/backends/imgui_impl_glfw.cpp
-    ${IMGUI_DIR}/backends/imgui_impl_opengl3.cpp
-)
+add_executable(spacetime ${SRC_FILES})
 
-add_library(imgui STATIC ${IMGUI_SOURCES})
-
-target_include_directories(imgui PUBLIC
-    ${IMGUI_DIR}
-    ${IMGUI_DIR}/backends
-)
-
-target_link_libraries(imgui PRIVATE glfw)
-
-# ───── Main Executable ─────
-add_executable(SpaceTime ${SRC_FILES})
-
-target_include_directories(SpaceTime PRIVATE
+target_include_directories(spacetime PRIVATE
     ${SRC_DIR}
-    ${EXTERNAL_DIR}
-    ${IMGUI_DIR}
-    ${IMGUI_DIR}/backends
+    ${IMGUI_BACKENDS_DIR}
 )
 
-target_link_libraries(SpaceTime PRIVATE
+target_link_libraries(spacetime PRIVATE
     glfw
-    imgui
+    glad::glad
+    imgui::imgui
     OpenGL::GL
     glm::glm
 )
 
-target_compile_definitions(SpaceTime PRIVATE GLFW_INCLUDE_NONE)
+target_compile_definitions(spacetime PRIVATE
+    GLFW_INCLUDE_NONE
+    IMGUI_IMPL_OPENGL_LOADER_GLAD
+)
 
-# ───── Asset Copying ─────
-file(GLOB_RECURSE SHADERS "${SRC_DIR}/shaders/*.vert" "${SRC_DIR}/shaders/*.frag" "${SRC_DIR}/shaders/*.comp")
+file(GLOB_RECURSE SHADERS "${SRC_DIR}/shaders/*")
 file(GLOB_RECURSE TEXTURES "${SRC_DIR}/textures/*")
 
 add_custom_target(copy-assets ALL
     DEPENDS ${SHADERS} ${TEXTURES}
     COMMAND ${CMAKE_COMMAND} -E copy_directory
-            ${SRC_DIR}/shaders ${CMAKE_CURRENT_BINARY_DIR}/shaders
+            ${SRC_DIR}/shaders
+            ${CMAKE_CURRENT_BINARY_DIR}/shaders
     COMMAND ${CMAKE_COMMAND} -E copy_directory
-            ${SRC_DIR}/textures ${CMAKE_CURRENT_BINARY_DIR}/textures
+            ${SRC_DIR}/textures
+            ${CMAKE_CURRENT_BINARY_DIR}/textures
 )
 
-add_dependencies(SpaceTime copy-assets)
+add_dependencies(spacetime copy-assets)

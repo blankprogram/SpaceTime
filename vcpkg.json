@@ -1,0 +1,13 @@
+{
+  "name": "spacetime",
+  "version": "0.1.0",
+  "dependencies": [
+    "glfw3",
+    "glm",
+    "imgui",
+    "glad",
+    "stb",
+    "opengl"
+  ],
+  "builtin-baseline": "640e297f1b67c4eb5a71d202a6a19355645676b5"
+}
