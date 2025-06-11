@@ -15,7 +15,9 @@ void GravityWell::setupBuffers() noexcept {
     int N = 2 * resolution_ + 1;
     int totalLines = 2 * (N - 1) * N;
     vertexCount_ = totalLines * 2;
+
     cpuBuffer_.resize(vertexCount_ * 3);
+    yGrid_.resize(N * N);
 
     glBindVertexArray(vao_.id);
     glBindBuffer(GL_ARRAY_BUFFER, vbo_.id);
@@ -32,20 +34,19 @@ void GravityWell::updateFromBodies(const std::vector<CelestialBody *> &bodies,
     int N = 2 * resolution_ + 1;
     float step = size_ / resolution_;
 
-    std::vector<float> yGrid(N * N);
     for (int j = 0; j < N; ++j) {
         for (int i = 0; i < N; ++i) {
             float x = (i - resolution_) * step;
             float z = (j - resolution_) * step;
             float rawY = 0.0f;
             for (auto *b : bodies) {
-                auto p = b->getPosition();
-                float dx = x - float(p.x);
-                float dz = z - float(p.z);
+                auto pos = b->getPosition();
+                float dx = x - float(pos.x);
+                float dz = z - float(pos.z);
                 float d = std::sqrt(dx * dx + dz * dz + 0.1f);
                 rawY += -G * float(b->getMass()) / d;
             }
-            yGrid[j * N + i] = rawY;
+            yGrid_[j * N + i] = rawY;
         }
     }
 
@@ -60,10 +61,10 @@ void GravityWell::updateFromBodies(const std::vector<CelestialBody *> &bodies,
     for (int j = 0; j < N; ++j) {
         for (int i = 0; i < N - 1; ++i) {
             float x0 = (i - resolution_) * step;
-            float x1 = (i + 1 - resolution_) * step;
             float z0 = (j - resolution_) * step;
-            float y0 = warp(yGrid[j * N + i]);
-            float y1 = warp(yGrid[j * N + (i + 1)]);
+            float y0 = warp(yGrid_[j * N + i]);
+            float x1 = (i + 1 - resolution_) * step;
+            float y1 = warp(yGrid_[j * N + (i + 1)]);
 
             *ptr++ = x0;
             *ptr++ = y0;
@@ -77,9 +78,9 @@ void GravityWell::updateFromBodies(const std::vector<CelestialBody *> &bodies,
         for (int j = 0; j < N - 1; ++j) {
             float x0 = (i - resolution_) * step;
             float z0 = (j - resolution_) * step;
+            float y0 = warp(yGrid_[j * N + i]);
             float z1 = (j + 1 - resolution_) * step;
-            float y0 = warp(yGrid[j * N + i]);
-            float y1 = warp(yGrid[(j + 1) * N + i]);
+            float y1 = warp(yGrid_[(j + 1) * N + i]);
 
             *ptr++ = x0;
             *ptr++ = y0;
@@ -91,8 +92,7 @@ void GravityWell::updateFromBodies(const std::vector<CelestialBody *> &bodies,
     }
 
     glBindBuffer(GL_ARRAY_BUFFER, vbo_.id);
-    glBufferSubData(GL_ARRAY_BUFFER, 0,
-                    GLsizei(cpuBuffer_.size() * sizeof(float)),
+    glBufferSubData(GL_ARRAY_BUFFER, 0, cpuBuffer_.size() * sizeof(float),
                     cpuBuffer_.data());
 }
 

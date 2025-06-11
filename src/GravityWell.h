@@ -24,6 +24,7 @@ class GravityWell {
     int resolution_;
 
     std::vector<float> cpuBuffer_;
+    std::vector<float> yGrid_;
 
     void setupBuffers() noexcept;
 };

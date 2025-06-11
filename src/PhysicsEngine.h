@@ -18,5 +18,7 @@ class PhysicsEngine {
     std::vector<CelestialBody *> bodies;
     std::vector<glm::dvec3> accelerations;
 
+    std::vector<glm::dvec3> velocities;
+
     void computeAccelerations();
 };
