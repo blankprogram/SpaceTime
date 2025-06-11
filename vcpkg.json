@@ -2,7 +2,7 @@
   "name": "spacetime",
   "version": "0.1.0",
   "dependencies": [
-    "glfw3",
+    { "name": "glfw3", "features": [ "wayland" ] },
     "glm",
     "imgui",
     "glad",
