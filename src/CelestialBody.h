@@ -2,6 +2,7 @@
 
 #include "raii.h"
 #include <glm/glm.hpp>
+#include <vector>
 
 struct TrailPoint {
     glm::vec3 position;
@@ -42,6 +43,7 @@ class CelestialBody {
 
     VertexArray trailVAO_;
     Buffer trailVBO_;
+    std::vector<float> trailData_;
 
     static constexpr size_t MAX_TRAILS = 1000;
     RingBuffer<TrailPoint, MAX_TRAILS> trail_;

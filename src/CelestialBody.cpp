@@ -1,15 +1,13 @@
 #include "CelestialBody.h"
 #include "raii.h"
-
 #define STB_IMAGE_IMPLEMENTATION
-#include <stb_image.h>
-
 #include <algorithm>
 #include <glm/gtc/type_ptr.hpp>
 #include <iostream>
 #include <numbers>
 #include <span>
-#include <vector>
+#include <stb_image.h>
+
 static constexpr float POINT_LIFE = 30.0f;
 static constexpr float SAMPLE_INTV = 0.05f;
 static constexpr double G_CONST = 0.5;
@@ -22,6 +20,7 @@ CelestialBody::CelestialBody(double mass, const glm::dvec3 &initialPos,
       trailColor_{trailColor} {
     initMesh();
     initTrail();
+    trailData_.reserve(MAX_TRAILS * 4);
     texture_.id = loadTexture(texturePath);
 }
 
@@ -111,17 +110,16 @@ void CelestialBody::initTrail() {
 }
 
 void CelestialBody::rebuildTrailBuffer() {
-    std::vector<float> data;
-    data.reserve(trail_.size() * 4);
+    trailData_.clear();
     trail_.for_each([&](const TrailPoint &tp) {
         float lf = std::max(tp.life / POINT_LIFE, 0.0f);
-        data.push_back(tp.position.x);
-        data.push_back(tp.position.y);
-        data.push_back(tp.position.z);
-        data.push_back(lf);
+        trailData_.push_back(tp.position.x);
+        trailData_.push_back(tp.position.y);
+        trailData_.push_back(tp.position.z);
+        trailData_.push_back(lf);
     });
 
-    std::span<const float> span{data};
+    std::span<const float> span{trailData_};
 
     glBindBuffer(GL_ARRAY_BUFFER, trailVBO_.id);
     glBufferSubData(GL_ARRAY_BUFFER, 0, span.size_bytes(), span.data());
@@ -163,6 +161,5 @@ void CelestialBody::drawTrail() const noexcept {
         return;
 
     glBindVertexArray(trailVAO_.id);
-
     glDrawArrays(GL_LINE_STRIP, 0, static_cast<GLsizei>(n));
 }
