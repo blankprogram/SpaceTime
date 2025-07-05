@@ -1,6 +1,7 @@
 #include "PhysicsEngine.h"
 #include "ComputeShader.h"
 #include <cmath>
+
 // Suzuki–Yoshida 4th-order coefficients
 namespace {
 const double alpha = 1.0 / (2.0 - std::cbrt(2.0));
@@ -18,37 +19,35 @@ const double k3 = gamma;
 
 void doDrift(std::vector<CelestialBody *> &bodies,
              const std::vector<glm::dvec3> &vels, double h) {
-    for (size_t i = 0; i < bodies.size(); ++i) {
-        auto r_old = bodies[i]->getPosition();
-        bodies[i]->setPosition(r_old + vels[i] * h);
-    }
+    for (size_t i = 0; i < bodies.size(); ++i)
+        bodies[i]->setPosition(bodies[i]->getPosition() + vels[i] * h);
 }
 
 void doKick(std::vector<CelestialBody *> &bodies,
             const std::vector<glm::dvec3> &accs, double h) {
-    for (size_t i = 0; i < bodies.size(); ++i) {
-        auto v_old = bodies[i]->getVelocity();
-        bodies[i]->setVelocity(v_old + accs[i] * h);
-    }
+    for (size_t i = 0; i < bodies.size(); ++i)
+        bodies[i]->setVelocity(bodies[i]->getVelocity() + accs[i] * h);
 }
 } // namespace
 
-PhysicsEngine::PhysicsEngine() = default;
-PhysicsEngine::~PhysicsEngine() = default;
+PhysicsEngine::PhysicsEngine()
+    : gShader(std::make_unique<ComputeShader>("shaders/gravity.comp")) {}
 
-void PhysicsEngine::addBody(CelestialBody *body) { bodies.push_back(body); }
+void PhysicsEngine::addBody(std::unique_ptr<CelestialBody> body) {
+    bodies.push_back(std::move(body));
+}
 
-const std::vector<CelestialBody *> &PhysicsEngine::getBodies() const {
-    return bodies;
+std::vector<CelestialBody *> PhysicsEngine::getBodies() const {
+    std::vector<CelestialBody *> result;
+    result.reserve(bodies.size());
+    for (const auto &b : bodies)
+        result.push_back(b.get());
+    return result;
 }
 
 void PhysicsEngine::computeAccelerations() {
-    if (!gShader)
-        gShader = new ComputeShader("shaders/gravity.comp");
-
     size_t n = bodies.size();
     std::vector<glm::vec4> posMass(n);
-
     for (size_t i = 0; i < n; ++i) {
         glm::dvec3 p = bodies[i]->getPosition();
         posMass[i] = glm::vec4((float)p.x, (float)p.y, (float)p.z,
@@ -84,32 +83,32 @@ void PhysicsEngine::step(double dt) {
     if (bodies.empty())
         return;
 
-    size_t n = bodies.size();
+    std::vector<CelestialBody *> rawBodies = getBodies();
+    size_t n = rawBodies.size();
     velocities.resize(n);
-
     for (size_t i = 0; i < n; ++i)
-        velocities[i] = bodies[i]->getVelocity();
+        velocities[i] = rawBodies[i]->getVelocity();
 
-    doDrift(bodies, velocities, d1 * dt);
+    doDrift(rawBodies, velocities, d1 * dt);
     computeAccelerations();
-    doKick(bodies, accelerations, k1 * dt);
+    doKick(rawBodies, accelerations, k1 * dt);
 
     for (size_t i = 0; i < n; ++i)
-        velocities[i] = bodies[i]->getVelocity();
-    doDrift(bodies, velocities, d2 * dt);
+        velocities[i] = rawBodies[i]->getVelocity();
+    doDrift(rawBodies, velocities, d2 * dt);
     computeAccelerations();
-    doKick(bodies, accelerations, k2 * dt);
+    doKick(rawBodies, accelerations, k2 * dt);
 
     for (size_t i = 0; i < n; ++i)
-        velocities[i] = bodies[i]->getVelocity();
-    doDrift(bodies, velocities, d3 * dt);
+        velocities[i] = rawBodies[i]->getVelocity();
+    doDrift(rawBodies, velocities, d3 * dt);
     computeAccelerations();
-    doKick(bodies, accelerations, k3 * dt);
+    doKick(rawBodies, accelerations, k3 * dt);
 
     for (size_t i = 0; i < n; ++i)
-        velocities[i] = bodies[i]->getVelocity();
-    doDrift(bodies, velocities, d4 * dt);
+        velocities[i] = rawBodies[i]->getVelocity();
+    doDrift(rawBodies, velocities, d4 * dt);
 
-    for (auto *b : bodies)
+    for (auto *b : rawBodies)
         b->updateTrail(static_cast<float>(dt));
 }

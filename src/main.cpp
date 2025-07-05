@@ -110,8 +110,7 @@ void addRandomBodies(PhysicsEngine &physics, int n, double mass = 100.0,
         auto body = std::make_unique<CelestialBody>(mass, pos, vel, 0.5f,
                                                     tex.c_str(), color);
 
-        physics.addBody(body.get());
-        body.release();
+        physics.addBody(std::move(body));
     }
 }
 int main() {
@@ -185,9 +184,9 @@ int main() {
         glm::dvec3(v3_orig.x, 0.0, v3_orig.y) * vScale, 0.5f,
         "textures/stone.jpg", glm::vec3(0.0f, 0.4f, 1.0f));
 
-    physics.addBody(body1.get());
-    physics.addBody(body2.get());
-    physics.addBody(body3.get());
+    physics.addBody(std::move(body1));
+    physics.addBody(std::move(body2));
+    physics.addBody(std::move(body3));
 
     addRandomBodies(physics, 100);
 

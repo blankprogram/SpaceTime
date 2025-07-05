@@ -1,24 +1,29 @@
+#pragma once
+
 #include "CelestialBody.h"
 #include "ComputeShader.h"
-#include <glad/glad.h> // ← Make sure this is included for GLuint
+#include <glad/glad.h>
+#include <glm/glm.hpp>
+#include <memory>
 #include <vector>
 
 class PhysicsEngine {
   public:
     PhysicsEngine();
-    ~PhysicsEngine();
+    ~PhysicsEngine() = default;
 
-    void addBody(CelestialBody *body);
+    void addBody(std::unique_ptr<CelestialBody> body);
     void step(double dt);
 
-    const std::vector<CelestialBody *> &getBodies() const;
+    std::vector<CelestialBody *> getBodies() const;
 
   private:
-    std::vector<CelestialBody *> bodies;
+    std::vector<std::unique_ptr<CelestialBody>> bodies;
     std::vector<glm::dvec3> accelerations;
     std::vector<glm::dvec3> velocities;
 
-    ComputeShader *gShader = nullptr;
+    std::unique_ptr<ComputeShader> gShader =
+        std::make_unique<ComputeShader>("shaders/gravity.comp");
 
     GLuint ssboBodies = 0;
     GLuint ssboAccels = 0;
