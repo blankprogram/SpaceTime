@@ -22,6 +22,7 @@ file(GLOB SRC_FILES
     ${SRC_DIR}/PhysicsEngine.cpp
     ${SRC_DIR}/Renderer.cpp
     ${SRC_DIR}/main.cpp
+    ${SRC_DIR}/ComputeShader.cpp
 )
 
 add_executable(spacetime ${SRC_FILES})

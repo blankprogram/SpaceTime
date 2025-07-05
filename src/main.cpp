@@ -10,6 +10,7 @@
 #include <imgui_impl_opengl3.h>
 #include <iostream>
 #include <memory>
+#include <random>
 
 constexpr int WINDOW_WIDTH = 800;
 constexpr int WINDOW_HEIGHT = 600;
@@ -89,7 +90,29 @@ void processInput(GLFWwindow *window) {
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
 }
+void addRandomBodies(PhysicsEngine &physics, int n, double mass = 100.0,
+                     double space = 50.0) {
+    std::default_random_engine rng{std::random_device{}()};
+    std::uniform_real_distribution<double> posDist(-space, space);
+    std::uniform_real_distribution<double> velDist(-1.0, 1.0);
+    std::uniform_real_distribution<float> colorDist(0.2f, 1.0f);
 
+    for (int i = 0; i < n; ++i) {
+        glm::dvec3 pos = glm::dvec3(posDist(rng), posDist(rng), posDist(rng));
+        glm::dvec3 vel = glm::dvec3(velDist(rng), velDist(rng), velDist(rng));
+        glm::vec3 color =
+            glm::vec3(colorDist(rng), colorDist(rng), colorDist(rng));
+
+        std::string tex = (i % 3 == 0)   ? "textures/dirt.jpg"
+                          : (i % 3 == 1) ? "textures/lava.png"
+                                         : "textures/stone.jpg";
+
+        auto body = std::make_unique<CelestialBody>(mass, pos, vel, 0.5f,
+                                                    tex.c_str(), color);
+
+        physics.addBody(body.get());
+    }
+}
 int main() {
     if (!glfwInit()) {
         std::cerr << "Failed to initialize GLFW.\n";
@@ -164,6 +187,8 @@ int main() {
     physics.addBody(body1.get());
     physics.addBody(body2.get());
     physics.addBody(body3.get());
+
+    addRandomBodies(physics, 100);
 
     lastFrame = glfwGetTime();
     const double maxSubstep = 0.01;

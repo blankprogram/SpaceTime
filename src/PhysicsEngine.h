@@ -1,7 +1,6 @@
-#pragma once
-
 #include "CelestialBody.h"
-#include <glm/glm.hpp>
+#include "ComputeShader.h"
+#include <glad/glad.h> // ← Make sure this is included for GLuint
 #include <vector>
 
 class PhysicsEngine {
@@ -17,8 +16,13 @@ class PhysicsEngine {
   private:
     std::vector<CelestialBody *> bodies;
     std::vector<glm::dvec3> accelerations;
-
     std::vector<glm::dvec3> velocities;
 
+    ComputeShader *gShader = nullptr;
+
+    GLuint ssboBodies = 0;
+    GLuint ssboAccels = 0;
+
     void computeAccelerations();
+    void computeAccelerationsGPU();
 };

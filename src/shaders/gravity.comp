@@ -1,0 +1,41 @@
+#version 450
+
+layout (local_size_x = 128) in;
+
+struct Body {
+    vec4 posMass;
+};
+
+layout(std430, binding = 0) readonly buffer BodyData {
+    Body bodies[];
+};
+
+layout(std430, binding = 1) writeonly buffer AccelData {
+    vec4 accels[];
+};
+
+const float G = 0.5;
+const float softening = 0.01;
+
+void main() {
+    uint i = gl_GlobalInvocationID.x;
+    if (i >= bodies.length()) return;
+
+    vec3 acc = vec3(0.0);
+    vec3 pi = bodies[i].posMass.xyz;
+    float mi = bodies[i].posMass.w;
+
+    for (uint j = 0; j < bodies.length(); ++j) {
+        if (i == j) continue;
+        vec3 pj = bodies[j].posMass.xyz;
+        float mj = bodies[j].posMass.w;
+
+        vec3 rij = pj - pi;
+        float distSqr = dot(rij, rij) + softening;
+        float invDist = inversesqrt(distSqr);
+        float invDist3 = invDist * invDist * invDist;
+
+        acc += G * mj * rij * invDist3;
+    }
+    accels[i] = vec4(acc, 0.0);
+}
