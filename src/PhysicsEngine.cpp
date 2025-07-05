@@ -1,8 +1,6 @@
 #include "PhysicsEngine.h"
 #include "ComputeShader.h"
-#include <chrono>
 #include <cmath>
-#include <iostream>
 // Suzuki–Yoshida 4th-order coefficients
 namespace {
 const double alpha = 1.0 / (2.0 - std::cbrt(2.0));
@@ -44,7 +42,7 @@ const std::vector<CelestialBody *> &PhysicsEngine::getBodies() const {
     return bodies;
 }
 
-void PhysicsEngine::computeAccelerationsGPU() {
+void PhysicsEngine::computeAccelerations() {
     if (!gShader)
         gShader = new ComputeShader("shaders/gravity.comp");
 
@@ -82,66 +80,30 @@ void PhysicsEngine::computeAccelerationsGPU() {
         accelerations[i] = glm::dvec3(accels[i]);
 }
 
-void PhysicsEngine::computeAccelerations() {
-    size_t n = bodies.size();
-    accelerations.resize(n);
-
-    for (size_t i = 0; i < n; ++i) {
-        glm::dvec3 a_i{0.0};
-        auto r_i = bodies[i]->getPosition();
-
-        for (size_t j = 0; j < n; ++j) {
-            if (i == j)
-                continue;
-            auto r_j = bodies[j]->getPosition();
-            double m_j = bodies[j]->getMass();
-            glm::dvec3 diff = r_j - r_i;
-            double dist2 = glm::dot(diff, diff) + 1e-15;
-            double invDist3 = 1.0 / (dist2 * std::sqrt(dist2));
-            a_i += (0.5 * m_j) * (diff * invDist3);
-        }
-        accelerations[i] = a_i;
-    }
-}
-
 void PhysicsEngine::step(double dt) {
     if (bodies.empty())
         return;
-    bool useGPU = true;
-    using clock = std::chrono::high_resolution_clock;
-    auto start = clock::now();
 
     size_t n = bodies.size();
     velocities.resize(n);
 
     for (size_t i = 0; i < n; ++i)
         velocities[i] = bodies[i]->getVelocity();
-    doDrift(bodies, velocities, d1 * dt);
 
-    if (useGPU)
-        computeAccelerationsGPU();
-    else
-        computeAccelerations();
+    doDrift(bodies, velocities, d1 * dt);
+    computeAccelerations();
     doKick(bodies, accelerations, k1 * dt);
 
     for (size_t i = 0; i < n; ++i)
         velocities[i] = bodies[i]->getVelocity();
     doDrift(bodies, velocities, d2 * dt);
-
-    if (useGPU)
-        computeAccelerationsGPU();
-    else
-        computeAccelerations();
+    computeAccelerations();
     doKick(bodies, accelerations, k2 * dt);
 
     for (size_t i = 0; i < n; ++i)
         velocities[i] = bodies[i]->getVelocity();
     doDrift(bodies, velocities, d3 * dt);
-
-    if (useGPU)
-        computeAccelerationsGPU();
-    else
-        computeAccelerations();
+    computeAccelerations();
     doKick(bodies, accelerations, k3 * dt);
 
     for (size_t i = 0; i < n; ++i)
@@ -150,9 +112,4 @@ void PhysicsEngine::step(double dt) {
 
     for (auto *b : bodies)
         b->updateTrail(static_cast<float>(dt));
-
-    auto end = clock::now();
-    double ms = std::chrono::duration<double, std::milli>(end - start).count();
-    std::cout << "[PhysicsEngine] Step (" << (useGPU ? "GPU" : "CPU")
-              << ") took " << ms << " ms" << std::endl;
 }

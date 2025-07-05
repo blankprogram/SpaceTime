@@ -24,5 +24,4 @@ class PhysicsEngine {
     GLuint ssboAccels = 0;
 
     void computeAccelerations();
-    void computeAccelerationsGPU();
 };

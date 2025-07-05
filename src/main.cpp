@@ -111,6 +111,7 @@ void addRandomBodies(PhysicsEngine &physics, int n, double mass = 100.0,
                                                     tex.c_str(), color);
 
         physics.addBody(body.get());
+        body.release();
     }
 }
 int main() {
