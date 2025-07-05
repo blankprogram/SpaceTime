@@ -2,11 +2,11 @@
   "name": "spacetime",
   "version": "0.1.0",
   "dependencies": [
-    { "name": "glfw3", "features": [ "wayland" ] },
+    { "name": "glfw3", "features": ["wayland"] },
     "glm",
-    "imgui",
     "glad",
     "stb",
-    "opengl"
+    "opengl",
+    { "name": "imgui", "features": ["glfw-binding", "opengl3-binding"] }
   ]
 }

@@ -16,23 +16,18 @@ find_package(glad REQUIRED)
 find_package(imgui REQUIRED)
 
 set(SRC_DIR ${CMAKE_SOURCE_DIR}/src)
-set(IMGUI_BACKENDS_DIR ${CMAKE_SOURCE_DIR}/external/imgui_backends)
-
-set(SRC_FILES
+file(GLOB SRC_FILES
     ${SRC_DIR}/CelestialBody.cpp
     ${SRC_DIR}/GravityWell.cpp
     ${SRC_DIR}/PhysicsEngine.cpp
     ${SRC_DIR}/Renderer.cpp
     ${SRC_DIR}/main.cpp
-    ${IMGUI_BACKENDS_DIR}/imgui_impl_glfw.cpp
-    ${IMGUI_BACKENDS_DIR}/imgui_impl_opengl3.cpp
 )
 
 add_executable(spacetime ${SRC_FILES})
 
 target_include_directories(spacetime PRIVATE
     ${SRC_DIR}
-    ${IMGUI_BACKENDS_DIR}
 )
 
 target_link_libraries(spacetime PRIVATE
